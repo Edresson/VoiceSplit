@@ -7,10 +7,18 @@
         "seed": 1234,
         "checkpoint_path": ""
     },
-    "data_config": {
+    "model":{
+        "lstm_dim": 400,
+        "fc1_dim:": 600,
+        "fc2_dim:": 513,  // = audio.num_freq
+        "emb_dim": 256 // 256 for GE2E encoder and 80 for Speech2Phone
+    },  
+    "audio": {
         "segment_length": 16000,
         "sampling_rate": 22050,
         "filter_length": 1024,
+        "num_freq": 513, // = filter_length// 2 + 1
+        "n_mel_channels":80,
         "hop_length": 256,
         "win_length": 1024,
         "mel_fmin": 0.0,

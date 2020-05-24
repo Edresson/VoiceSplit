@@ -9,12 +9,14 @@ MAX_WAV_VALUE = 32768.0
 class AudioProcessor(object):
     from utils.audio import WaveGlowSTFT as STFT
     def __init__(self, segment_length, filter_length,
-                 hop_length, win_length, sampling_rate, mel_fmin, mel_fmax):
+                 hop_length, win_length, sampling_rate, mel_fmin, mel_fmax, n_mel_channels=80,num_freq=None):
         self.stft = STFT(filter_length=filter_length,
                                     hop_length=hop_length,
                                     win_length=win_length,
                                     sampling_rate=sampling_rate,
-                                    mel_fmin=mel_fmin, mel_fmax=mel_fmax)
+                                    mel_fmin=mel_fmin, 
+                                    mel_fmax=mel_fmax,
+                                    n_mel_channels=n_mel_channels)
         self.segment_length = segment_length
         self.sampling_rate = sampling_rate
 

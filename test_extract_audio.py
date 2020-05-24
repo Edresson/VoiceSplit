@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     with open(args.config) as f:
         data = f.read()
-    data_config = json.loads(data)["data_config"]
+    data_config = json.loads(data)["audio"]
     mel2samp = AudioProcessor(**data_config)
     
     # Make directory if it doesn't exist
