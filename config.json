@@ -1,0 +1,19 @@
+{
+    "train_config": {
+        "output_directory": "checkpoints",
+        "epochs": 100000,
+        "learning_rate": 1e-4,
+        "batch_size": 12,
+        "seed": 1234,
+        "checkpoint_path": ""
+    },
+    "data_config": {
+        "segment_length": 16000,
+        "sampling_rate": 22050,
+        "filter_length": 1024,
+        "hop_length": 256,
+        "win_length": 1024,
+        "mel_fmin": 0.0,
+        "mel_fmax": 8000.0
+    }
+}
