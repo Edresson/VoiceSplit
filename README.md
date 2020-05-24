@@ -16,4 +16,16 @@ The neural architecture will be based on VoiceFilter: Targeted Voice Separation 
 For the task we intend to use the LibreSpeech dataset initially. However, to use it in this task, we need to generate audios with overlappings voices.
 
 
+## Current ToDos: 
+*  code trainner and dataset load
+*  code preprocessing in LibreSpeech following models/voicefilter/data-LibreSpeech/README.md and generic soluction for other datasets.
 
+* import QRNNs from official repository: https://github.com/salesforce/pytorch-qrnn
+    * see QRNN+DRELU activation:  https://arxiv.org/pdf/1707.08214v2.pdf we going implemente this??
+    * Propouse QRNN+MISH ?? if yes we need compare in other task because  train in this task is very slow ... I think its very interesting because QRNN is fully convoluctional and MISH is very good for conv layers ... 
+
+* implemente Mish activate function (its very easy)
+
+* Implement Powerlaw compression loss following:https://github.com/stegben/voicefilter/tree/powerlaw-compression-loss
+
+* try Speech2Phone if Speech2Phone dont Work well use a GE2E (the same speaker encoder used on Google's paper), this implementation is very good https://github.com/Edresson/GE2E-Speaker-Encoder and use CorentinJ pretrained model.
