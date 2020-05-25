@@ -1,11 +1,26 @@
 {
+    "dataset":{
+        "train_dir":"",
+        "test_dir":"",
+        "format":{ // format for glob search
+            "emb": "*-emb.pt",
+            "mixed":"*-target.pt",
+            "target":"*-mixed.wav"
+        }
+
+    },
     "train_config": {
         "output_directory": "checkpoints",
         "epochs": 100000,
         "learning_rate": 1e-4,
         "batch_size": 12,
         "seed": 1234,
-        "checkpoint_path": ""
+        "num_workers": 14,
+        "logs_path": ""
+    },
+    "test_config": {
+        "batch_size": 1,
+        "num_workers": 1
     },
     "model":{
         "lstm_dim": 400,
