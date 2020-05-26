@@ -30,7 +30,6 @@ def mel_to_mag_spectrogram(y, mel_basis, ap):
     mel_basis = ap.stft.mel_basis.cpu().detach().numpy()
     _mel_to_linear
 
-
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
