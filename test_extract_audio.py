@@ -6,6 +6,7 @@ import json
 import torch
 import torch.utils.data
 from utils.audio_processor import AudioProcessor
+from utils.generic_utils import load_config
 if __name__ == "__main__":
     # Get defaults so it can work with no Sacred
     parser = argparse.ArgumentParser()
@@ -16,10 +17,8 @@ if __name__ == "__main__":
                         help='Output directory')
     args = parser.parse_args()
 
-    with open(args.config) as f:
-        data = f.read()
-    data_config = json.loads(data)["audio"]
-    mel2samp = AudioProcessor(**data_config)
+    config = load_config(args.config)
+    ap = AudioProcessor(**config.audio)
     
     # Make directory if it doesn't exist
     if not os.path.isdir(args.output_dir):
@@ -27,9 +26,18 @@ if __name__ == "__main__":
         os.chmod(args.output_dir, 0o775)
 
     filepath = args.wavfile_path
-    melspectrogram = mel2samp.get_mel_from_audio_path(filepath)
 
+    # extract spectrogram
+    spectrogram = ap.get_spec_from_audio_path(filepath)
+    
+    
+    # save spectrogram
     filename = os.path.basename(filepath)
     new_filepath = os.path.join(args.output_dir, filename + '.pt')
-    torch.save(melspectrogram, new_filepath)
-    print("Spectogram with shape:",melspectrogram.shape, "Saved in", new_filepath)
+    torch.save(spectrogram, new_filepath)
+    
+    # reverse spectrogram for wave file using Griffin-Lim
+    wav = ap.inv_spectrogram(spectrogram)
+    ap.save_wav(wav, '../test-spec-exctraction.wav')
+
+    print("Spectogram with shape:",spectrogram.shape, "Saved in", new_filepath)

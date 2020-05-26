@@ -45,7 +45,6 @@ from librosa.filters import mel as librosa_mel_fn
 
 from utils.stft import STFT
 
-
     
 def dynamic_range_compression(x, C=1, clip_val=1e-5):
     """
@@ -82,6 +81,23 @@ class WaveGlowSTFT(torch.nn.Module):
         output = dynamic_range_decompression(magnitudes)
         return output
 
+    def mag_spectrogram(self, y):
+        """Computes mag-spectrograms from a batch of waves
+        PARAMS
+        ------
+        y: Variable(torch.FloatTensor) with shape (B, T) in range [-1, 1]
+        RETURNS
+        -------
+        mag_output: torch.FloatTensor of shape (B, n_mag_channels, T)
+        """
+        assert(torch.min(y.data) >= -1)
+        assert(torch.max(y.data) <= 1)
+
+        magnitudes, phases = self.stft_fn.transform(y)
+        mag_output = magnitudes.data
+        mag_output = self.spectral_normalize(mag_output)
+        return mag_output
+
     def mel_spectrogram(self, y):
         """Computes mel-spectrograms from a batch of waves
         PARAMS
@@ -98,4 +114,22 @@ class WaveGlowSTFT(torch.nn.Module):
         magnitudes = magnitudes.data
         mel_output = torch.matmul(self.mel_basis, magnitudes)
         mel_output = self.spectral_normalize(mel_output)
+        return mel_output
+
+    def mag_to_mel_spectrogram(self, y):
+        """Computes mel-spectrograms from a batch of mag-spectrograms
+        PARAMS
+        ------
+        y: Variable(torch.FloatTensor) with shape (B, n_mel_channels, T)
+        RETURNS
+        -------
+        mel_output: torch.FloatTensor of shape (B, n_mel_channels, T)
+        """
+        assert(torch.min(y.data) >= -1)
+        assert(torch.max(y.data) <= 1)
+        # de-normalise because i normalise this in mag_spectrogram() function
+        magnitudes = self.spectral_de_normalize(y)
+        mel_output = torch.matmul(self.mel_basis, magnitudes)
+        mel_output = self.spectral_normalize(mel_output)
+
         return mel_output

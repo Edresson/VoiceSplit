@@ -56,6 +56,9 @@ def train_collate_fn(item):
     # concate tensors in dim 0
     target_list = stack(target_list, dim=0)
     mixed_list = stack(mixed_list, dim=0)
+    embs_list = stack(embs_list, dim=0).detach()
+    
+
     return embs_list, target_list, mixed_list
 
 def test_collate_fn(batch):

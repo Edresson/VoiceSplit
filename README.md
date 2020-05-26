@@ -17,8 +17,14 @@ For the task we intend to use the LibreSpeech dataset initially. However, to use
 
 
 ## Current ToDos: 
-*  code trainner and dataset load
-*  code preprocessing in LibreSpeech following models/voicefilter/data-LibreSpeech/README.md and generic soluction for other datasets.
+* code dataloader (V) 
+* code tests from dataloader
+* code trainner
+* code preprocessing (generate data) in LibreSpeech following models/voicefilter/data-LibreSpeech/README.md and generic soluction for other datasets. For details check the voicefilter paper and https://google.github.io/speaker-id/publications/VoiceFilter/
+
+* see this paper https://link.springer.com/chapter/10.1007/978-3-030-37731-1_3 for ideas, its new state of the art.
+
+
 
 * import QRNNs from official repository: https://github.com/salesforce/pytorch-qrnn
     * see QRNN+DRELU activation:  https://arxiv.org/pdf/1707.08214v2.pdf we going implemente this??
@@ -26,6 +32,11 @@ For the task we intend to use the LibreSpeech dataset initially. However, to use
 
 * implemente Mish activate function (its very easy)
 
+* Use NovoGrad optimizer https://arxiv.org/abs/1905.11286 ?? They is better than adam, is used in Jasper the state of art in Automatic Speech Recognition 
+
 * Implement Powerlaw compression loss following:https://github.com/stegben/voicefilter/tree/powerlaw-compression-loss
+
+* use a multi loss ?? mybe Powerlaw compression loss with   Si-SNR (pit_criterion.py)  with L1 loss ??  L1 loss is used in text2Speech, and in text2peech the speech is very clean.  L1 loss with Powerlaw compression loss ??? L1 loss is better than MSE in Text2Speech.
+
 
 * try Speech2Phone if Speech2Phone dont Work well use a GE2E (the same speaker encoder used on Google's paper), this implementation is very good https://github.com/Edresson/GE2E-Speaker-Encoder and use CorentinJ pretrained model.

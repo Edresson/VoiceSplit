@@ -1,15 +1,34 @@
-import torch
-import numpy as np
-from scipy.signal import get_window
-import librosa.util as librosa_util
-from scipy.io.wavfile import read
-
-
 import os
+import torch
 import json
 import re
-import torch
 import datetime
+
+import torch.nn as nn
+import numpy as np
+import librosa.util as librosa_util
+
+from scipy.signal import get_window
+from scipy.io.wavfile import read
+from mir_eval.separation import bss_eval_sources
+
+def powerlaw_compressed_loss(criterion, output, target, power, complex_loss_ratio):
+    # criterion is nn.MSELoss() instance
+    # Power-law compressed loss
+    spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(target), power))
+
+    complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(target, min=0.0), power))
+
+    loss = spec_loss + (complex_loss * complex_loss_ratio)
+
+    return loss
+
+def _mel_to_linear(self, mel_spec, mel_basis):
+    return np.maximum(1e-10, np.dot(np.linalg.pinv(mel_basis), mel_spec))
+
+def mel_to_mag_spectrogram(y, mel_basis, ap):
+    mel_basis = ap.stft.mel_basis.cpu().detach().numpy()
+    _mel_to_linear
 
 
 class AttrDict(dict):
@@ -92,3 +111,37 @@ def load_wav_to_torch(full_path):
     """
     sampling_rate, data = read(full_path)
     return torch.from_numpy(data).float(), sampling_rate
+
+def set_init_dict(model_dict, checkpoint, c):
+    """
+    This Function is adpted from: https://github.com/mozilla/TTS
+    Credits: @erogol
+    """
+    # Partial initialization: if there is a mismatch with new and old layer, it is skipped.
+    for k, v in checkpoint['model'].items():
+        if k not in model_dict:
+            print(" | > Layer missing in the model definition: {}".format(k))
+    # 1. filter out unnecessary keys
+    pretrained_dict = {
+        k: v
+        for k, v in checkpoint['model'].items() if k in model_dict
+    }
+    # 2. filter out different size layers
+    pretrained_dict = {
+        k: v
+        for k, v in pretrained_dict.items()
+        if v.numel() == model_dict[k].numel()
+    }
+    # 3. skip reinit layers
+    if c.train_config.reinit_layers is not None:
+        for reinit_layer_name in c.train_config.reinit_layers:
+            pretrained_dict = {
+                k: v
+                for k, v in pretrained_dict.items()
+                if reinit_layer_name not in k
+            }
+    # 4. overwrite entries in the existing state dict
+    model_dict.update(pretrained_dict)
+    print(" | > {} / {} layers are restored.".format(len(pretrained_dict),
+                                                     len(model_dict)))
+    return model_dict
