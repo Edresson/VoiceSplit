@@ -22,7 +22,7 @@ from utils.generic_utils import validation, powerlaw_compressed_loss
 from models.voicefilter.model import VoiceFilter
 
 
-def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, logger, hp, model_name, cuda=True):
+def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, logger, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
         model = VoiceFilter(c)
     # elif():
@@ -31,9 +31,9 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
 
     if c.train_config.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=c.train_config.learning_rate)
+                                     lr=c.train_config['learning_rate'])
     else:
-        raise Exception("The %s  not is a optimizer supported" % hp.train.optimizer)
+        raise Exception("The %s  not is a optimizer supported" % c.train['optimizer'])
 
     step = 0
     if checkpoint_path is not None:
@@ -68,9 +68,9 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
 
     # definitions for power-law compressed loss
     power = c.loss.power
-    complex_ratio = c.loss.complex_loss_ratio
+    complex_ratio = c.loss['complex_loss_ratio']
 
-    for _ in range(c.train_config.epochs):
+    for _ in range(c.train_config['epochs']):
         model.train()
         for emb, target, mixed in trainloader:
             if cuda:
@@ -110,7 +110,7 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                     'config_str': str(c),
                 }, save_path)
                 print("Saved checkpoint to: %s" % save_path)
-                #validation(audio, model, testloader, tensorboard, step)
+                validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
 
 
 
@@ -131,6 +131,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     c = load_config(args.config_path)
+    ap = AudioProcessor(**config.audio)
 
     tensorboard = TensorboardWriter(log_dir, c)
 
@@ -143,4 +144,4 @@ if __name__ == '__main__':
     train_dataloader = train_dataloader(c)
     test_dataloader = test_dataloader(c)
     
-    #train(args, log_path, args.checkpoint_path, trainloader, testloader, tensorboard, c, args.model)
+    train(args, log_path, args.checkpoint_path, trainloader, testloader, tensorboard, c, args.model, ap, cuda=True)

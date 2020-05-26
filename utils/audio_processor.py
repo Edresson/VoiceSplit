@@ -6,7 +6,7 @@ from utils.generic_utils import load_wav_to_torch
 from scipy.io.wavfile import read
 import scipy
 import librosa
-MAX_WAV_VALUE = 32768.0
+MAX_WAV_VALUE = 32767.0
 
 class AudioProcessor(object):
     def __init__(self, segment_length, filter_length,

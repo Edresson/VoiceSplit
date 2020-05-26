@@ -19,10 +19,15 @@ The neural architecture will be based on VoiceFilter: Targeted Voice Separation 
 For the task we intend to use the LibreSpeech dataset initially. However, to use it in this task, we need to generate audios with overlappings voices.
 
 
-## Current ToDos: 
-* code dataloader (V) 
-* code tests from dataloader
-* code trainner
+## Current ToDos:
+
+* ** WaveGlow works in 22khz :( and for comparison it VoiceFilter we need train in LibriSpeech and LibreSpeech is 16khz**:
+    * For fix this i need support a WaveRNN universal (https://github.com/mozilla/TTS/issues/221).
+    * Look soluction for support two backends WaveRNN and WaveGlow (implemented)
+
+* code dataloader (partial fixed, because LibriSpeech have 16kHz sample rate and universal WaveGlow is treined in 22khz) 
+* code tests from dataloader (v)
+* code trainner (v)
 * code preprocessing (generate data) in LibreSpeech following models/voicefilter/data-LibreSpeech/README.md and generic soluction for other datasets. For details check the voicefilter paper and https://google.github.io/speaker-id/publications/VoiceFilter/
 
 * see this paper https://link.springer.com/chapter/10.1007/978-3-030-37731-1_3 for ideas, its new state of the art.
@@ -37,9 +42,17 @@ For the task we intend to use the LibreSpeech dataset initially. However, to use
 
 * Use NovoGrad optimizer https://arxiv.org/abs/1905.11286 ?? They is better than adam, is used in Jasper the state of art in Automatic Speech Recognition 
 
-* Implement Powerlaw compression loss following:https://github.com/stegben/voicefilter/tree/powerlaw-compression-loss
+* Implement Powerlaw compression loss following:https://github.com/stegben/voicefilter/tree/powerlaw-compression-loss (v)
 
 * use a multi loss ?? mybe Powerlaw compression loss with   Si-SNR (pit_criterion.py)  with L1 loss ??  L1 loss is used in text2Speech, and in text2peech the speech is very clean.  L1 loss with Powerlaw compression loss ??? L1 loss is better than MSE in Text2Speech.
 
 
 * try Speech2Phone if Speech2Phone dont Work well use a GE2E (the same speaker encoder used on Google's paper), this implementation is very good https://github.com/Edresson/GE2E-Speaker-Encoder and use CorentinJ pretrained model.
+
+
+
+
+## Future Features
+
+* Two Universal Neural Vocoders is supported (WaveGlow and WaveRNN)
+* Two Neural Speakers encoders is supported (GE2E and Speech2Phone)

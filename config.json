@@ -5,7 +5,9 @@
         "format":{ // format for glob search
             "emb": "*-emb.pt",
             "mixed":"*-target.pt",
-            "target":"*-mixed.wav"
+            "target":"*-mixed.pt",
+            "target_wav":"*-target.wav",
+            "mixed_wav": "*-mixed.wav"
         }
 
     },
@@ -32,23 +34,62 @@
     "model":{
         "lstm_dim": 400,
         "fc1_dim:": 600,
-        "fc2_dim:": 513,  // = audio.num_freq
+        "fc2_dim:": 513, // = audio.backend.num_freq 513 for waveglow and 1024 for wavernn 
         "emb_dim": 80 // 256 for GE2E encoder and 80 for Speech2Phone
     },  
     "audio": {
-        // its useful for disable mel spec extraction, and use linear spectrograms
-        "mel_spec": false, // if you use this = false, you need use the fuction AudioProcessor.mag_to_mel(mag) for use Waveglow as vocoder
-        "segment_length": 16000,
-        "sampling_rate": 22050,
-        "filter_length": 1024,
-        "num_freq": 513, // = filter_length// 2 + 1
-        "n_mel_channels":80,
-        "hop_length": 256,
-        "win_length": 1024,
-        "mel_fmin": 0.0,
-        "mel_fmax": 8000.0,
         // Griffin-Lim
-        "power": 1.5,           // value to sharpen wav signals after GL algorithm.
-        "griffin_lim_iters": 60// #griffin-lim iterations. 30-60 is a good range. Larger the value, slower the generation.
+        "backend":"waveglow", // waveglow or wavernn for datasets with sample rate > 16khz waveglow is recommend because de sythesis is better
+        "waveglow":{
+            // its useful for disable mel spec extraction, and use linear spectrograms
+            "mel_spec": false, // if you use this = false, you need use the fuction AudioProcessor.mag_to_mel(mag) for use Waveglow as vocoder
+            "segment_length": 16000,
+            "sampling_rate": 22050,
+            "filter_length": 1024,
+            "num_freq": 513, // = filter_length// 2 + 1
+            "n_mel_channels":80,
+            "hop_length": 256,
+            "win_length": 1024,
+            "mel_fmin": 0.0,
+            "mel_fmax": 8000.0,
+            "power": 1.5,           // value to sharpen wav signals after GL algorithm.
+            "griffin_lim_iters": 60// #griffin-lim iterations. 30-60 is a good range. Larger the value, slower the generation.
+            },
+        "wavernn":{
+            // Audio processing parameters
+            "num_mels": 80,         // size of the mel spec frame. 
+            "num_freq": 1025,       // number of stft frequency levels. Size of the linear spectogram frame.
+            "sample_rate": 16000,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
+            "frame_length_ms": 50,  // stft window length in ms.
+            "frame_shift_ms": 12.5, // stft window hop-lengh in ms.
+            "preemphasis": 0.98,    // pre-emphasis to reduce spec noise and make it more structured. If 0.0, no -pre-emphasis.
+            "min_level_db": -100,   // normalization range
+            "ref_level_db": 20,     // reference level db, theoretically 20db is the sound of air.
+            "power": 1.5,           // value to sharpen wav signals after GL algorithm.
+            "griffin_lim_iters": 60,// #griffin-lim iterations. 30-60 is a good range. Larger the value, slower the generation.
+            // Normalization parameters
+            "signal_norm": true,    // normalize the spec values in range [0, 1]
+            "symmetric_norm": false, // move normalization to range [-1, 1]
+            "max_norm": 1,          // scale normalization to range [-max_norm, max_norm] or [0, max_norm]
+            "clip_norm": true,      // clip normalized values into the range.
+            "mel_fmin": 0.0,         // minimum freq level for mel-spec. ~50 for male and ~95 for female voices. Tune for dataset!!
+            "mel_fmax": 8000.0,        // maximum freq level for mel-spec. Tune for dataset!!
+            "do_trim_silence": true,  // enable trimming of slience of audio as you load it. LJspeech (false), TWEB (false), Nancy (true)
+            "power": 1.5,           // value to sharpen wav signals after GL algorithm.
+            "griffin_lim_iters": 60// #griffin-lim iterations. 30-60 is a good range. Larger the value, slower the generation.
+        },
+        "voicefilter":{ // its use the same opensource voicefilter implementation (https://github.com/mindslab-ai/voicefilter/)
+            "n_fft": 1200,
+            "num_freq": 601,// n_fft//2 + 1
+            "sample_rate": 16000,
+            "hop_length": 160,
+            "win_length": 400,
+            "min_level_db": -100.0,
+            "ref_level_db": 20.0,
+            "preemphasis": 0.97,
+            "power": 0.30
+
+        }
+
     }
 }

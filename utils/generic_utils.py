@@ -16,19 +16,42 @@ def powerlaw_compressed_loss(criterion, output, target, power, complex_loss_rati
     # criterion is nn.MSELoss() instance
     # Power-law compressed loss
     spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(target), power))
-
     complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(target, min=0.0), power))
-
     loss = spec_loss + (complex_loss * complex_loss_ratio)
 
     return loss
 
-def _mel_to_linear(self, mel_spec, mel_basis):
-    return np.maximum(1e-10, np.dot(np.linalg.pinv(mel_basis), mel_spec))
+def validation(criterion, ap, model, embedder, testloader, writer, step, cuda=True):
+    model.eval()
+    with torch.no_grad():
+        for batch in testloader:
+            emb, target_spec, mixed_spec, target_wav, mixed_wav = batch[0]
 
-def mel_to_mag_spectrogram(y, mel_basis, ap):
-    mel_basis = ap.stft.mel_basis.cpu().detach().numpy()
-    _mel_to_linear
+            emb = emb.unsqueeze(0)
+            target_spec = target_spec.unsqueeze(0)
+            mixed_spec = mixed_spec.unsqueeze(0)
+
+            if cuda:
+                emb = emb.cuda()
+                target_spec = target_spec.cuda()
+                mixed_spec = mixed_spec.cuda()
+        
+            est_mask = model(mixed_spec, emb)
+            est_mag = est_mask * mixed_spec
+            test_loss = criterion(target_spec, est_mag).item()
+
+            mixed_spec = mixed_spec[0].cpu().detach().numpy()
+            target_spec = target_spec[0].cpu().detach().numpy()
+            est_mag = est_mag[0].cpu().detach().numpy()
+            est_wav = ap.inv_spectrogram(est_mag)
+            est_mask = est_mask[0].cpu().detach().numpy()
+
+            sdr = bss_eval_sources(target_wav, est_wav, False)[0][0]
+            writer.log_evaluation(test_loss, sdr,
+                                  mixed_wav, target_wav, est_wav,
+                                  mixed_spec.T, target_spec.T, est_mag.T, est_mask.T,
+                                  step)
+            break
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
