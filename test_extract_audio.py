@@ -5,7 +5,7 @@ import argparse
 import json
 import torch
 import torch.utils.data
-from utils.audio_processor import AudioProcessor
+from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
 from utils.generic_utils import load_config
 if __name__ == "__main__":
     # Get defaults so it can work with no Sacred
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = load_config(args.config)
-    ap = AudioProcessor(**config.audio)
+    ap = AudioProcessor(config.audio)
     
     # Make directory if it doesn't exist
     if not os.path.isdir(args.output_dir):

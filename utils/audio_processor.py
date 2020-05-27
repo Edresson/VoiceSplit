@@ -6,9 +6,34 @@ from utils.generic_utils import load_wav_to_torch
 from scipy.io.wavfile import read
 import scipy
 import librosa
-MAX_WAV_VALUE = 32767.0
+MAX_WAV_VALUE = 32768.0
 
-class AudioProcessor(object):
+class WrapperAudioProcessor(object):
+    def __init__(self, config_audio):
+        # get backend
+        backend = config_audio['backend']
+        if backend == 'waveglow':
+            self.ap = WaveGlowAudioProcessor(**config_audio[backend])
+        # elif backend == 'wavernn':
+        else:
+            raise ValueError("Invalid AudioProcessor Backend: ")
+
+    def inv_spectrogram(self, spectrogram):
+        return self.ap.inv_spectrogram(spectrogram)
+
+    def get_spec_from_audio_path(self, audio_path):
+        return self.ap.get_spec_from_audio_path(audio_path)
+
+    def get_spec_from_audio(self, audio):
+        return self.ap.get_spec_from_audio(audio)
+
+    def save_wav(self, wav, path):
+        return self.ap.save_wav(wav, path)
+
+    def load_wav(self, path):
+        return self.ap.load_wav(path)
+
+class WaveGlowAudioProcessor(object):
     def __init__(self, segment_length, filter_length,
                  hop_length, win_length, sampling_rate, mel_fmin, mel_fmax, n_mel_channels=80,num_freq=None, power=None, griffin_lim_iters=None, mel_spec=None):
         self.stft = WaveGlowSTFT(filter_length=filter_length,
@@ -43,11 +68,15 @@ class AudioProcessor(object):
         magspec = torch.squeeze(magspec, 0)
         return magspec
 
+    def get_spec_from_audio(self, audio):
+        if self.mel_spec:
+            spectrogram = self.get_mel(audio)
+        else:
+            spectrogram = self.get_mag(audio)
+        return spectrogram
+
     def get_spec_from_audio_path(self, audio_path):
-        audio, sampling_rate = load_wav_to_torch(audio_path)
-        if sampling_rate != self.sampling_rate:
-            raise ValueError("{} SR doesn't match target {} SR".format(
-                sampling_rate, self.sampling_rate))
+        audio = self.load_wav(audio_path)
         if self.mel_spec:
             spectrogram = self.get_mel(audio)
         else:
@@ -70,14 +99,6 @@ class AudioProcessor(object):
 
     def _mel_to_linear(self, mel_spec, mel_basis):
         return np.maximum(1e-10, np.dot(np.linalg.pinv(mel_basis), mel_spec))
-
-    """ def inv_melspectrogram(self, mel_spectrogram):
-        '''Converts melspectrogram to waveform using librosa'''
-        # torch.from_numpy()
-        S = self.stft.spectral_de_normalize(mel_spectrogram).cpu().detach().numpy()
-        mel_basis = self.stft.mel_basis.cpu().detach().numpy()
-        S = self._mel_to_linear(S, mel_basis)  # Convert back to linear
-        return self._griffin_lim(S**self.power)"""
 
     def _librosa_istft(self, y):
         return librosa.istft(
@@ -104,3 +125,10 @@ class AudioProcessor(object):
     def save_wav(self, wav, path):
         wav_norm = wav * (MAX_WAV_VALUE / max(0.01, np.max(np.abs(wav))))
         scipy.io.wavfile.write(path, self.sampling_rate, wav_norm.astype(np.int16))
+
+    def load_wav(self,audio_path):
+        audio, sampling_rate = load_wav_to_torch(audio_path)
+        if sampling_rate != self.sampling_rate:
+            raise ValueError("{} SR doesn't match target {} SR".format(
+                sampling_rate, self.sampling_rate))
+        return audio

@@ -44,6 +44,8 @@ For the task we intend to use the LibreSpeech dataset initially. However, to use
 
 * Implement Powerlaw compression loss following:https://github.com/stegben/voicefilter/tree/powerlaw-compression-loss (v)
 
+* Use loss function in two phases, get mixed spec and subtract the output spectrogram, in theory the new spectrogram have a others sounds without voice of target spectogram. Calculate loss in this spectogram and sum with real loss. In final train we get a two spectrograms with good quality. 
+
 * use a multi loss ?? mybe Powerlaw compression loss with   Si-SNR (pit_criterion.py)  with L1 loss ??  L1 loss is used in text2Speech, and in text2peech the speech is very clean.  L1 loss with Powerlaw compression loss ??? L1 loss is better than MSE in Text2Speech.
 
 
