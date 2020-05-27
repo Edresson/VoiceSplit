@@ -11,9 +11,9 @@ if __name__ == "__main__":
     # Get defaults so it can work with no Sacred
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--wavfile_path", required=True)
-    parser.add_argument('-c', '--config', type=str,
+    parser.add_argument('-c', '--config', type=str, required=True
                         help='JSON file for configuration')
-    parser.add_argument('-o', '--output_dir', type=str,
+    parser.add_argument('-o', '--output_dir', type=str, default='../'
                         help='Output directory')
     args = parser.parse_args()
 
