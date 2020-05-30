@@ -192,7 +192,7 @@ class WaveRNNAudioProcessor(object):
         else:
             D = self._stft(y)
         S = self._amp_to_db(np.abs(D)) - self.ref_level_db
-        return self._normalize(S)
+        return self._normalize(S).T
 
     def melspectrogram(self, y):
         if self.preemphasis != 0:
@@ -200,7 +200,7 @@ class WaveRNNAudioProcessor(object):
         else:
             D = self._stft(y)
         S = self._amp_to_db(self._linear_to_mel(np.abs(D))) - self.ref_level_db
-        return self._normalize(S)
+        return self._normalize(S).T
 
     def inv_spectrogram(self, spectrogram):
         if self.mel_spec:
@@ -226,6 +226,7 @@ class WaveRNNAudioProcessor(object):
 
     def inv_linear_spectrogram(self, spectrogram):
         """Converts spectrogram to waveform using librosa"""
+        spectrogram = spectrogram.T
         S = self._denormalize(spectrogram)
         S = self._db_to_amp(S + self.ref_level_db)  # Convert back to linear
         # Reconstruct phase
@@ -236,6 +237,7 @@ class WaveRNNAudioProcessor(object):
 
     def inv_mel_spectrogram(self, mel_spectrogram):
         '''Converts mel spectrogram to waveform using librosa'''
+        mel_spectrogram = mel_spectrogram.T
         D = self._denormalize(mel_spectrogram)
         S = self._db_to_amp(D + self.ref_level_db)
         S = self._mel_to_linear(S)  # Convert back to linear
@@ -349,14 +351,14 @@ class WaveGlowAudioProcessor(object):
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
-        return melspec
+        return melspec.T
 
     def get_mag(self, audio_norm):
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         magspec = self.stft.mag_spectrogram(audio_norm)
         magspec = torch.squeeze(magspec, 0)
-        return magspec
+        return magspec.T
 
     def get_spec_from_audio(self, audio):
         if self.mel_spec:
@@ -374,12 +376,12 @@ class WaveGlowAudioProcessor(object):
         return spectrogram
 
     def mag_to_mel(self, y):
-        return self.stft.mag_to_mel_spectrogram(y)
+        return self.stft.mag_to_mel_spectrogram(y.T).T
 
     # Griffin-Lim
     def inv_spectrogram(self, spectrogram):
         """Converts spectrogram to waveform using librosa"""
-        # torch.from_numpy()
+        spectrogram = spectrogram.T
         S = self.stft.spectral_de_normalize(spectrogram).cpu().detach().numpy()
         if self.mel_spec:
             mel_basis = self.stft.mel_basis.cpu().detach().numpy()

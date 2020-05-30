@@ -38,8 +38,7 @@
         "emb_dim": 80 // 256 for GE2E encoder and 80 for Speech2Phone
     },  
     "audio": {
-        // Griffin-Lim
-        "backend":"voicefilter", // waveglow or wavernn for datasets with sample rate > 16khz waveglow is recommend because de sythesis is better
+        "backend":"waveglow", // waveglow or wavernn or voicefilter for datasets with sample rate > 16khz waveglow is recommend because de sythesis is better
         "mel_spec": false, // if you use this = false, you need use the fuction AudioProcessor.mag_to_mel(mag) for use Waveglow as vocoder
         "waveglow":{
             // its useful for disable mel spec extraction, and use linear spectrograms
