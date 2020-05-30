@@ -25,6 +25,8 @@ class WrapperAudioProcessor(object):
             self.ap = WaveGlowAudioProcessor(**config_audio[backend], mel_spec=mel_spec)
         elif backend == 'wavernn':
             self.ap = WaveRNNAudioProcessor(**config_audio[backend], mel_spec=mel_spec)
+        elif backend == 'voicefilter':
+            self.ap = openVoiceFilterAudioProcessor(**config_audio[backend])
         else:
             raise ValueError("Invalid AudioProcessor Backend: ")
 
@@ -69,6 +71,7 @@ class WaveRNNAudioProcessor(object):
                  griffin_lim_iters=None,
                  do_trim_silence=False,
                  mel_spec=True,
+                 force_convert_SR=False,
                  **kwargs):
 
         print(" > Setting up Audio Processor...")
@@ -93,13 +96,14 @@ class WaveRNNAudioProcessor(object):
         self.do_trim_silence = do_trim_silence
         self.n_fft, self.hop_length, self.win_length = self._stft_parameters()
         self.mel_spec = mel_spec
+        self.force_convert_SR = force_convert_SR
         print(" | > Audio Processor attributes.")
         members = vars(self)
         for key, value in members.items():
             print("   | > {}:{}".format(key, value))
 
     def save_wav(self, wav, path):
-        wav_norm = wav * (32767 / max(0.01, np.max(np.abs(wav))))
+        wav_norm = wav * (MAX_WAV_VALUE / max(0.01, np.max(np.abs(wav))))
         io.wavfile.write(path, self.sample_rate, wav_norm.astype(np.int16))
 
     def _linear_to_mel(self, spectrogram):
@@ -294,10 +298,14 @@ class WaveRNNAudioProcessor(object):
         return x
 
     def load_wav(self, filename, sr=None):
+        if self.force_convert_SR:
+            sr = self.sample_rate
         if sr is None:
             x, sr = sf.read(filename)
         else:
             x, sr = librosa.load(filename, sr=sr)
+        
+
         if self.do_trim_silence:
             x = self.trim_silence(x)
         assert self.sample_rate == sr, "%s vs %s"%(self.sample_rate, sr)
@@ -336,16 +344,14 @@ class WaveGlowAudioProcessor(object):
         self.mel_spec = mel_spec
         self.n_fft = (num_freq - 1) * 2
 
-    def get_mel(self, audio):
-        audio_norm = audio / MAX_WAV_VALUE
+    def get_mel(self, audio_norm):
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
         return melspec
 
-    def get_mag(self, audio):
-        audio_norm = audio / MAX_WAV_VALUE
+    def get_mag(self, audio_norm):
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         magspec = self.stft.mag_spectrogram(audio_norm)
@@ -415,4 +421,100 @@ class WaveGlowAudioProcessor(object):
         if sampling_rate != self.sampling_rate:
             raise ValueError("{} SR doesn't match target {} SR".format(
                 sampling_rate, self.sampling_rate))
-        return audio
+        return audio / MAX_WAV_VALUE
+
+class openVoiceFilterAudioProcessor():
+    #  This class is adapted from VoiceFilter open source implementation (https://github.com/mindslab-ai/voicefilter/blob/master/utils/audio.py)
+    # So Credits for: @seungwonpark
+    def __init__(self, sample_rate, n_fft, num_freq, hop_length, win_length, preemphasis, power, min_level_db, ref_level_db, num_mels, griffin_lim_iters):
+        self.sample_rate = sample_rate
+        self.n_fft = n_fft
+        self.num_freq = num_freq
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.min_level_db = min_level_db
+        self.ref_level_db = ref_level_db
+        self.num_mels = num_mels
+        self.preemphasis = preemphasis
+        self.power = power
+        self.griffin_lim_iters = griffin_lim_iters
+
+        self.mel_basis = librosa.filters.mel(sr=self.sample_rate,
+                                             n_fft=self.n_fft,
+                                             n_mels=self.num_mels)
+
+    def get_mel(self, y):
+        y = librosa.core.stft(y=y, n_fft=self.n_fft,
+                              hop_length=self.hop_length,
+                              win_length=self.win_length,
+                              window='hann')
+        magnitudes = np.abs(y) ** 2
+        mel = np.log10(np.dot(self.mel_basis, magnitudes) + 1e-6)
+        return mel
+
+    def wav2spec(self, y):
+        D = self.stft(y)
+        S = self.amp_to_db(np.abs(D)) - self.ref_level_db
+        S= self.normalize(S)
+        S = S.T # to make [time, freq]
+        return S
+
+    def spec2wav(self, spectrogram):
+        spectrogram = spectrogram.T
+        S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
+        return self._griffin_lim(S**self.power)
+
+    def stft(self, y):
+        return librosa.stft(y=y, n_fft=self.n_fft,
+                            hop_length=self.hop_length,
+                            win_length=self.win_length)
+
+    def _griffin_lim(self, S):
+        angles = np.exp(2j * np.pi * np.random.rand(*S.shape))
+        S_complex = np.abs(S).astype(np.complex)
+        y = self._istft(S_complex * angles)
+        for i in range(self.griffin_lim_iters):
+            angles = np.exp(1j * np.angle(self._stft(y)))
+            y = self._istft(S_complex * angles)
+        return y
+
+    def _stft(self, y):
+        return librosa.stft(
+            y=y,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+        )
+
+    def _istft(self, y):
+        return librosa.istft(
+            y, hop_length=self.hop_length, win_length=self.win_length)
+
+    def amp_to_db(self, x):
+        return 20.0 * np.log10(np.maximum(1e-5, x))
+
+    def db_to_amp(self, x):
+        return np.power(10.0, x * 0.05)
+
+    def normalize(self, S):
+        return np.clip(S / -self.min_level_db, -1.0, 0.0) + 1.0
+
+    def denormalize(self, S):
+        return (np.clip(S, 0.0, 1.0) - 1.0) * -self.min_level_db
+    
+    def inv_spectrogram(self, spectrogram):
+        return self.spec2wav(spectrogram)
+
+    def get_spec_from_audio_path(self, audio_path):
+        return self.wav2spec(self.load_wav(audio_path))
+
+    def get_spec_from_audio(self, audio):
+        return self.wav2spec(audio)
+
+    def save_wav(self, wav, path):
+        wav_norm = wav * (MAX_WAV_VALUE / max(0.01, np.max(np.abs(wav))))
+        scipy.io.wavfile.write(path, self.sample_rate, wav_norm.astype(np.int16))
+
+    def load_wav(self, path):
+        wav, _ = librosa.load(path, sr=self.sample_rate)
+        return wav
