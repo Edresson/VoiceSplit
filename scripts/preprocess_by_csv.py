@@ -26,12 +26,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, required=True,
                         help="Config json file")
+    parser.add_argument('-r', '--dataset_root_dir', type=str, required=True,
+                        help="Config json file")               
     parser.add_argument('-d', '--train_data_csv', type=str, required=True,
                         help="Train Data csv contains rows [clean_utterance,embedding_utterance,interference_utterance] example in datasets/LibriSpeech/train.csv")
     parser.add_argument('-t', '--test_data_csv', type=str, required=True,
                         help="Test Data csv contains rows [clean_utterance,embedding_utterance,interference_utterance] example in datasets/LibriSpeech/dev.csv")
     parser.add_argument('-o', '--out_dir', type=str, required=True,
                         help="Directory of output training triplet")
+    parser.add_argument('-l', '--librispeech', type=str, required=False, default=False,
+                        help="Librispeech format, if true load with librispeech format")
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -49,13 +53,42 @@ if __name__ == '__main__':
     output_dir_train = os.path.join(args.out_dir, 'train')
     output_dir_test = os.path.join(args.out_dir, 'test')
 
-    train_data = pd.read_csv(args.train_data_csv, sep=',')
-    test_data = pd.read_csv(args.test_data_csv, sep=',')
+    dataset_root_dir = args.dataset_root_dir
 
-    train_arr = list(range(len(train_data)))
-    with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(train_wrapper, **{'num':train_arr ,'train':True}, total=len(train_arr)))
 
-    test_arr = list(range(len(test_data)))
+    train_data_csv = pd.read_csv(args.train_data_csv, sep=',').values
+    test_data_csv = pd.read_csv(args.test_data_csv, sep=',').values
+    train_data = []
+    test_data = []
+    if args.librispeech:
+        for c, e, i in train_data_csv:
+            splits = c.split('-')
+            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'.wav')
+            splits = e.split('-')
+            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
+            splits = i.split('-')
+            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
+            train_data.append(target_path, emb_ref_path, interference_path)
+        
+        for c, e, i in test_data_csv:
+            splits = c.split('-')
+            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'.wav')
+            splits = e.split('-')
+            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
+            splits = i.split('-')
+            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
+            test_data.append(target_path, emb_ref_path, interference_path)
+    else:
+        for c, e, i in train_data_csv:
+            train_data.append(os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i))
+        
+        for c, e, i in test_data_csv:
+            test_data.append(os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i))
+
+    train_idx = list(range(len(train_data)))
     with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(test_wrapper, **{'num':test_arr ,'train':False}), total=len(test_arr)))
+        r = list(tqdm.tqdm(p.imap(train_wrapper, **{'num':train_idx ,'train':True}, total=len(train_idx)))
+
+    test_idx = list(range(len(test_data)))
+    with Pool(cpu_num) as p:
+        r = list(tqdm.tqdm(p.imap(test_wrapper, **{'num':test_idx ,'train':False}), total=len(test_idx)))
