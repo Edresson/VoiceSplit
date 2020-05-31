@@ -3,6 +3,7 @@ import torch
 import json
 import re
 import datetime
+import librosa
 
 import torch.nn as nn
 import numpy as np
@@ -12,11 +13,59 @@ from scipy.signal import get_window
 from scipy.io.wavfile import read
 from mir_eval.separation import bss_eval_sources
 
-def powerlaw_compressed_loss(criterion, output, target, power, complex_loss_ratio):
+def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path):
+    data_out_dir = output_dir
+    emb_audio, _ = librosa.load(embedding_utterance_path, sr=sample_rate)
+    clean_audio, _ = librosa.load(clean_utterance_path, sr=sample_rate)
+    interference, _ = librosa.load(interference_utterance_path, sr=sample_rate)
+    assert len(d.shape) == len(clean_audio.shape) == len(interference.shape) == 1, \
+        'wav files must be mono, not stereo'
+
+    # trim initial and end  wave file silence using librosa
+    emb_audio, _ = librosa.effects.trim(emb_audio, top_db=20)
+    clean_audio, _ = librosa.effects.trim(clean_audio, top_db=20)
+    interference, _ = librosa.effects.trim(interference, top_db=20)
+
+    # calculate frames using audio necessary for config.audio['audio_len'] seconds
+    audio_len_seconds = int(sample_rate * hp.data.audio_len)
+
+    # if merged audio is shorter than audio_len_seconds, discard it
+    if clean_audio.shape[0] < audio_len_seconds or interference.shape[0] < audio_len_seconds:
+        return
+
+    # merge audio
+    mixed_audio = clean_audio[:audio_len_seconds] + interference[:audio_len_seconds]
+
+    # normlise audio
+    norm_factor = np.max(np.abs(mixed_audio)) * 1.1
+    clean_audio = clean_audio/norm_factor
+    interference = interference/norm_factor
+    mixed_audio = mixed_audio/norm_factor
+
+    # save normalized wave files and wav emb ref
+    target_wav_path = glob_re_to_filename(data_out_dir, form['target_wav'], num)
+    mixed_wav_path = glob_re_to_filename(data_out_dir, form['mixed_wav'], num)
+    emb_wav_path = glob_re_to_filename(data_out_dir, form['emb_wav'], num)
+    librosa.output.write_wav(emb_wav_path, emb_audio, sample_rate)
+    librosa.output.write_wav(target_wav_path, clean_audio, sample_rate)
+    librosa.output.write_wav(mixed_wav_path, mixed_audio, sample_rate)
+
+    # extract and save spectrograms
+    clean_spec = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num)
+    mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num)
+    torch.save(torch.from_numpy(clean_spec), clean_spec_path)
+    torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
+
+def glob_re_to_filename(dire, glob, num):
+    return os.path.join(dire, glob.replace('*', '%06d' % num))
+
+def powerlaw_compressed_loss(criterion, output, interference, power, complex_loss_ratio):
     # criterion is nn.MSELoss() instance
     # Power-law compressed loss
-    spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(target), power))
-    complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(target, min=0.0), power))
+    spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(interference), power))
+    complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(interference, min=0.0), power))
     loss = spec_loss + (complex_loss * complex_loss_ratio)
 
     return loss
@@ -25,31 +74,31 @@ def validation(criterion, ap, model, embedder, testloader, writer, step, cuda=Tr
     model.eval()
     with torch.no_grad():
         for batch in testloader:
-            emb, target_spec, mixed_spec, target_wav, mixed_wav = batch[0]
+            emb, clean_spec, mixed_spec, interference_wav, mixed_wav = batch[0]
 
             emb = emb.unsqueeze(0)
-            target_spec = target_spec.unsqueeze(0)
+            clean_spec = clean_spec.unsqueeze(0)
             mixed_spec = mixed_spec.unsqueeze(0)
 
             if cuda:
                 emb = emb.cuda()
-                target_spec = target_spec.cuda()
+                clean_spec = clean_spec.cuda()
                 mixed_spec = mixed_spec.cuda()
         
             est_mask = model(mixed_spec, emb)
             est_mag = est_mask * mixed_spec
-            test_loss = criterion(target_spec, est_mag).item()
+            test_loss = criterion(clean_spec, est_mag).item()
 
             mixed_spec = mixed_spec[0].cpu().detach().numpy()
-            target_spec = target_spec[0].cpu().detach().numpy()
+            clean_spec = clean_spec[0].cpu().detach().numpy()
             est_mag = est_mag[0].cpu().detach().numpy()
             est_wav = ap.inv_spectrogram(est_mag)
             est_mask = est_mask[0].cpu().detach().numpy()
 
-            sdr = bss_eval_sources(target_wav, est_wav, False)[0][0]
+            sdr = bss_eval_sources(interference_wav, est_wav, False)[0][0]
             writer.log_evaluation(test_loss, sdr,
-                                  mixed_wav, target_wav, est_wav,
-                                  mixed_spec.T, target_spec.T, est_mag.T, est_mask.T,
+                                  mixed_wav, interference_wav, est_wav,
+                                  mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
                                   step)
             break
 

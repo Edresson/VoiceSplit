@@ -329,11 +329,11 @@ class WaveGlowAudioProcessor(object):
     so this part of the code is under the license imposed on the repository. And the credits go to your developers. 
     """
     def __init__(self, segment_length, filter_length,
-                 hop_length, win_length, sampling_rate, mel_fmin, mel_fmax, n_mel_channels=80,num_freq=None, power=None, griffin_lim_iters=None, mel_spec=None):
+                 hop_length, win_length, sample_rate, mel_fmin, mel_fmax, n_mel_channels=80,num_freq=None, power=None, griffin_lim_iters=None, mel_spec=None):
         self.stft = WaveGlowSTFT(filter_length=filter_length,
                                     hop_length=hop_length,
                                     win_length=win_length,
-                                    sampling_rate=sampling_rate,
+                                    sampling_rate=sample_rate,
                                     mel_fmin=mel_fmin, 
                                     mel_fmax=mel_fmax,
                                     n_mel_channels=n_mel_channels)

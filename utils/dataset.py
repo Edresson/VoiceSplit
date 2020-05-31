@@ -8,8 +8,9 @@ class Dataset(Dataset):
     """
     Class for load a train and test from dataset generate by import_librispeech.py and others
     """
-    def __init__(self, c, train=True):
+    def __init__(self, c, ap, train=True):
         self.c = c
+        self.ap = ap
         self.train = train
         self.dataset_dir = c.dataset['train_dir'] if train else c.dataset['test_dir']
         assert not os.path.isdir(self.dataset_dir),'Test or Train dataset dir is incorrect! Fix it in config.json'
@@ -34,14 +35,14 @@ class Dataset(Dataset):
             emb = torch.load(self.emb_list[idx])
             target_spec = torch.load(self.target_spec_list[idx])
             mixed_spec = torch.load(self.mixed_spec_list[idx])
-            mixed_wav, _ = librosa.load(self.mixed_wav_list[idx], self.c.audio['sampling_rate'])
-            target_wav, _ = librosa.load(self.target_wav_list[idx], self.c.audio['sampling_rate'])
+            mixed_wav = self.ap.load_wav(self.mixed_wav_list[idx])
+            target_wav = self.ap.load_wav(self.target_wav_list[idx])
             return emb, target_spec, mixed_spec, target_wav, mixed_wav
     def __len__(self):
         return len(self.emb_list)
 
-def train_dataloader(c):
-    return DataLoader(dataset=Dataset(c, train=True),
+def train_dataloader(c, ap):
+    return DataLoader(dataset=Dataset(c, ap, train=True),
                           batch_size=c.train_config['batch_size'],
                           shuffle=True,
                           num_workers=c.train_config['num_workers'],
@@ -50,8 +51,8 @@ def train_dataloader(c):
                           drop_last=True,
                           sampler=None)
 
-def test_dataloader(c, args):
-    return DataLoader(dataset=Dataset(c, train=False),
+def test_dataloader(c, ap):
+    return DataLoader(dataset=Dataset(c, ap, train=False),
                           collate_fn=test_collate, batch_size=c.test_config['batch_size'], 
                           shuffle=False, num_workers=c.test_config['num_workers'])
 

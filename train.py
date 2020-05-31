@@ -141,7 +141,7 @@ if __name__ == '__main__':
     if(not os.path.isdir(c.dataset.train_dir)) or (not os.path.isdir(c.dataset.test_dir)):
         raise Exception("Please verify directories of dataset in "+args.config_path)
 
-    train_dataloader = train_dataloader(c)
-    test_dataloader = test_dataloader(c)
+    train_dataloader = train_dataloader(c, ap)
+    test_dataloader = test_dataloader(c, ap)
     
     train(args, log_path, args.checkpoint_path, trainloader, testloader, tensorboard, c, args.model, ap, cuda=True)
