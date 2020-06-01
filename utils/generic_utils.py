@@ -18,7 +18,7 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
     emb_audio, _ = librosa.load(embedding_utterance_path, sr=sample_rate)
     clean_audio, _ = librosa.load(clean_utterance_path, sr=sample_rate)
     interference, _ = librosa.load(interference_utterance_path, sr=sample_rate)
-    assert len(d.shape) == len(clean_audio.shape) == len(interference.shape) == 1, \
+    assert len(emb_audio.shape) == len(clean_audio.shape) == len(interference.shape) == 1, \
         'wav files must be mono, not stereo'
 
     # trim initial and end  wave file silence using librosa
@@ -27,14 +27,16 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
     interference, _ = librosa.effects.trim(interference, top_db=20)
 
     # calculate frames using audio necessary for config.audio['audio_len'] seconds
-    audio_len_seconds = int(sample_rate * hp.data.audio_len)
+    audio_len_seconds = int(sample_rate * audio_len)
 
     # if merged audio is shorter than audio_len_seconds, discard it
     if clean_audio.shape[0] < audio_len_seconds or interference.shape[0] < audio_len_seconds:
         return
 
+    clean_audio = clean_audio[:audio_len_seconds]
+    interference = interference[:audio_len_seconds]
     # merge audio
-    mixed_audio = clean_audio[:audio_len_seconds] + interference[:audio_len_seconds]
+    mixed_audio = clean_audio + interference
 
     # normlise audio
     norm_factor = np.max(np.abs(mixed_audio)) * 1.1

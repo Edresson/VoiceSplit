@@ -9,18 +9,17 @@ import numpy as np
 from multiprocessing import Pool, cpu_count
 
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor
-from util.generic_utils import mix_wavfiles
+from utils.generic_utils import mix_wavfiles
 from utils.generic_utils import load_config
-import pandas as pd
-
+import pandas as  pd
 
 
 if __name__ == '__main__':
     def train_wrapper(num):
-        clean_utterance, embedding_utterance, interference_utterance = train_data[num]
+        clean_utterance_path, embedding_utterance_path, interference_utterance_path = train_data[num]
         mix_wavfiles(output_dir_train, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
     def test_wrapper(num):
-        clean_utterance, embedding_utterance, interference_utterance = test_data[num]
+        clean_utterance_path, embedding_utterance_path, interference_utterance_path = test_data[num]
         mix_wavfiles(output_dir_test, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
 
     parser = argparse.ArgumentParser()
@@ -49,7 +48,7 @@ if __name__ == '__main__':
 
     sample_rate = config.audio[config.audio['backend']]['sample_rate']
     audio_len = config.audio['audio_len']
-    form = config.dataset.format
+    form = config.dataset['format']
     output_dir_train = os.path.join(args.out_dir, 'train')
     output_dir_test = os.path.join(args.out_dir, 'test')
 
@@ -68,7 +67,7 @@ if __name__ == '__main__':
             emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
             splits = i.split('-')
             interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
-            train_data.append(target_path, emb_ref_path, interference_path)
+            train_data.append([target_path, emb_ref_path, interference_path])
         
         for c, e, i in test_data_csv:
             splits = c.split('-')
@@ -77,18 +76,18 @@ if __name__ == '__main__':
             emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
             splits = i.split('-')
             interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
-            test_data.append(target_path, emb_ref_path, interference_path)
+            test_data.append([target_path, emb_ref_path, interference_path])
     else:
         for c, e, i in train_data_csv:
-            train_data.append(os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i))
+            train_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i)])
         
         for c, e, i in test_data_csv:
-            test_data.append(os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i))
+            test_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i)])
 
     train_idx = list(range(len(train_data)))
     with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(train_wrapper, **{'num':train_idx ,'train':True}, total=len(train_idx)))
+        r = list(tqdm.tqdm(p.imap(train_wrapper, train_idx), total=len(train_idx)))
 
     test_idx = list(range(len(test_data)))
     with Pool(cpu_num) as p:
-        r = list(tqdm.tqdm(p.imap(test_wrapper, **{'num':test_idx ,'train':False}), total=len(test_idx)))
+        r = list(tqdm.tqdm(p.imap(test_wrapper, test_idx), total=len(test_idx)))

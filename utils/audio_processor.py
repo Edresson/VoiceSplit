@@ -338,7 +338,7 @@ class WaveGlowAudioProcessor(object):
                                     mel_fmax=mel_fmax,
                                     n_mel_channels=n_mel_channels)
         self.segment_length = segment_length
-        self.sampling_rate = sampling_rate
+        self.sampling_rate = sample_rate
         self.hop_length = hop_length
         self.win_length = win_length
         self.power = power
