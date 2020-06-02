@@ -84,6 +84,15 @@ if __name__ == '__main__':
         for c, e, i in test_data_csv:
             test_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i)])
 
+    '''train_idx = list(range(len(train_data)))
+    print("Preprocessing Train")
+    for i in tqdm.tqdm(train_idx, total=len(train_idx)):
+        train_wrapper(i)
+    print("Preprocessing Test")
+    test_idx = list(range(len(test_data)))
+    for i in  tqdm.tqdm(test_idx,total=len(test_idx)):
+        test_wrapper(i)'''
+    
     train_idx = list(range(len(train_data)))
     with Pool(cpu_num) as p:
         r = list(tqdm.tqdm(p.imap(train_wrapper, train_idx), total=len(train_idx)))
