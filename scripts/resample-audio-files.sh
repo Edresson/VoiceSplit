@@ -22,17 +22,6 @@ run_with_lock(){
 N=32 # set "N" as your CPU core number.
 open_sem $N
 for f in $(find . -name "*.flac"); do
-    if [ -f "${f%.*}.wav" ]; then
-        echo "${f%.*}.wav exist"
-        if LANG=C file -b --mime-type ${f%.*}.wav | grep -q audio/x-wav ; then :;
-            echo "${f%.*}.wav is valid wav"
-        else
-            echo "${f%.*}.wav is not valid wav convert"
-            run_with_lock ffmpeg -y -i "$f" -ar 16000 -ac 1 "${f%.*}.wav"
-        fi    
-    else 
-        echo "${f%.*}.wav is not valid wav" 
-        # convert to 16 khz mono
-        run_with_lock ffmpeg -y -i "$f" -ar 16000 -ac 1 "${f%.*}.wav"
-    fi
+    # convert to 16 khz mono
+    run_with_lock ffmpeg -y -i "$f" -ar 16000 -ac 1 "${f%.*}.wav"
 done

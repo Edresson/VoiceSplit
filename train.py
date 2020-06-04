@@ -13,23 +13,21 @@ from utils.generic_utils import set_init_dict
 
 from utils.tensorboard import TensorboardWriter
 
-from utils.train import train
-
 from utils.dataset import train_dataloader, test_dataloader
 
 from utils.generic_utils import validation, powerlaw_compressed_loss
 
 from models.voicefilter.model import VoiceFilter
+from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
 
-
-def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, logger, c, model_name, ap, cuda=True):
+def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
         model = VoiceFilter(c)
     # elif():
     else:
         print(" The model '",model_name, "' is not suported")
 
-    if c.train_config.optimizer == 'adam':
+    if c.train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(),
                                      lr=c.train_config['learning_rate'])
     else:
@@ -39,7 +37,7 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     if checkpoint_path is not None:
         print("Continue training from checkpoint: %s" % checkpoint_path)
         try:
-            if c.train_config.reinit_layers:
+            if c.train_config['reinit_layers']:
                 raise RuntimeError
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
             model.load_state_dict(checkpoint['model'])
@@ -67,7 +65,7 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     #criterion = nn.L1Loss()
 
     # definitions for power-law compressed loss
-    power = c.loss.power
+    power = c.loss['power']
     complex_ratio = c.loss['complex_loss_ratio']
 
     for _ in range(c.train_config['epochs']):
@@ -77,7 +75,6 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                 target = target.cuda()
                 mixed = mixed.cuda()
                 emb = emb.cuda()
-
             mask = model(mixed, emb)
             output = mixed * mask
 
@@ -96,13 +93,13 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                 break
 
             # write loss to tensorboard
-            if step % c.train_config.summary_interval == 0:
+            if step % c.train_config['summary_interval'] == 0:
                 tensorboard.log_training(loss, step)
-                #print("Write summary at step %d" % step)
+                print("Write summary at step %d" % step)
 
             # save checkpoint file  and evaluate and save sample to tensorboard
-            if step % c.train_config.checkpoint_interval == 0:
-                save_path = os.path.join(pt_dir, 'checkpoint_%d.pt' % step)
+            if step % c.train_config['checkpoint_interval'] == 0:
+                save_path = os.path.join(log_dir, 'checkpoint_%d.pt' % step)
                 torch.save({
                     'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
@@ -111,6 +108,7 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                 }, save_path)
                 print("Saved checkpoint to: %s" % save_path)
                 validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
+                model.train()
 
 
 
@@ -131,17 +129,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     c = load_config(args.config_path)
-    ap = AudioProcessor(**config.audio)
+    ap = AudioProcessor(c.audio)
 
-    tensorboard = TensorboardWriter(log_dir, c)
+    
 
-    log_path = os.path.join(c.logs_path, args.model)
+    log_path = os.path.join(c.train_config['logs_path'], args.model)
     os.makedirs(log_path, exist_ok=True)
-   
-    if(not os.path.isdir(c.dataset.train_dir)) or (not os.path.isdir(c.dataset.test_dir)):
+    audio_config = c.audio[c.audio['backend']]
+    tensorboard = TensorboardWriter(log_path, audio_config)
+    if(not os.path.isdir(c.dataset['train_dir'])) or (not os.path.isdir(c.dataset['test_dir'])):
         raise Exception("Please verify directories of dataset in "+args.config_path)
 
     train_dataloader = train_dataloader(c, ap)
     test_dataloader = test_dataloader(c, ap)
-    
-    train(args, log_path, args.checkpoint_path, trainloader, testloader, tensorboard, c, args.model, ap, cuda=True)
+    train(args, log_path, args.checkpoint_path, train_dataloader, test_dataloader, tensorboard, c, args.model, ap, cuda=True)

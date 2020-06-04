@@ -12,8 +12,8 @@ class VoiceFilter(nn.Module):
     def __init__(self, config):
         super(VoiceFilter, self).__init__()
         self.config = config
-        assert self.config.audio.filter_length // 2 + 1 == self.config.audio.num_freq == self.config.model.fc2_dim, \
-            "STFT params is defined incorrectly, the model expect model.fc2_dim == num_freq and num_freq == filter_length // 2 + 1"
+        self.audio = self.config.audio[self.config.audio['backend']]
+    
         convs = [
             # cnn1
             nn.ZeroPad2d((3, 3, 0, 0)),
@@ -56,14 +56,13 @@ class VoiceFilter(nn.Module):
         self.conv = nn.Sequential(*convs)
 
         self.lstm = nn.LSTM(
-            8*self.config.audio.num_freq + self.config.model.emb_dim,
-            self.config.model.lstm_dim,
+            8*self.audio['num_freq'] + self.config.model['emb_dim'],
+            self.config.model['lstm_dim'],
             batch_first=True,
             bidirectional=True)
-
-        self.fc1 = nn.Linear(2*self.config.model.lstm_dim, self.config.model.fc1_dim)
-
-        self.fc2 = nn.Linear(self.config.model.fc1_dim, self.config.model.fc2_dim)
+        self.fc1 = nn.Linear(2*self.config.model['lstm_dim'], self.config.model['fc1_dim'])
+        
+        self.fc2 = nn.Linear(self.config.model['fc1_dim'], self.config.model['fc2_dim'])
 
     def forward(self, x, speaker_embedding):
         # x: [B, T, num_freq]
@@ -81,7 +80,6 @@ class VoiceFilter(nn.Module):
         # speaker_embedding: [B, T, emb_dim]
 
         x = torch.cat((x, speaker_embedding), dim=2) # [B, T, 8*num_freq + emb_dim]
-
         x, _ = self.lstm(x) # [B, T, 2*lstm_dim]
         x = F.relu(x)
         x = self.fc1(x) # x: [B, T, fc1_dim]

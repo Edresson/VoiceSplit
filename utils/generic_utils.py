@@ -72,7 +72,7 @@ def powerlaw_compressed_loss(criterion, output, interference, power, complex_los
 
     return loss
 
-def validation(criterion, ap, model, embedder, testloader, writer, step, cuda=True):
+def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
     model.eval()
     with torch.no_grad():
         for batch in testloader:
@@ -98,7 +98,7 @@ def validation(criterion, ap, model, embedder, testloader, writer, step, cuda=Tr
             est_mask = est_mask[0].cpu().detach().numpy()
 
             sdr = bss_eval_sources(interference_wav, est_wav, False)[0][0]
-            writer.log_evaluation(test_loss, sdr,
+            tensorboard.log_evaluation(test_loss, sdr,
                                   mixed_wav, interference_wav, est_wav,
                                   mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
                                   step)

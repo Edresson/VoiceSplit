@@ -1,8 +1,8 @@
 import os
-import glob.glob as glob
+from glob import glob
 import torch
 from torch.utils.data import Dataset, DataLoader
-import torch.stack as stack
+from torch import stack
 
 class Dataset(Dataset):
     """
@@ -13,14 +13,15 @@ class Dataset(Dataset):
         self.ap = ap
         self.train = train
         self.dataset_dir = c.dataset['train_dir'] if train else c.dataset['test_dir']
-        assert not os.path.isdir(self.dataset_dir),'Test or Train dataset dir is incorrect! Fix it in config.json'
+        assert os.path.isdir(self.dataset_dir),'Test or Train dataset dir is incorrect! Fix it in config.json'
         
-        self.emb_list = self.find_files_by_format(c.dataset.format['emb'])
-        self.target_spec_list = self.find_files_by_format(c.dataset.format['target'])
-        self.mixed_spec_list = self.find_files_by_format(c.dataset.format['mixed'])
+        format_data = c.dataset['format']
+        self.emb_list = self.find_files_by_format(format_data['emb'])
+        self.target_spec_list = self.find_files_by_format(format_data['target'])
+        self.mixed_spec_list = self.find_files_by_format(format_data['mixed'])
         if not train:
-            self.target_wav_list = self.find_files_by_format(c.dataset.format['target_wav'])
-            self.mixed_wav_list = self.find_files_by_format(c.dataset.format['mixed_wav'])
+            self.target_wav_list = self.find_files_by_format(format_data['target_wav'])
+            self.mixed_wav_list = self.find_files_by_format(format_data['mixed_wav'])
         # asserts for integrity
         assert len(self.emb_list) == len(self.target_spec_list) == len(self.mixed_spec_list), " The number of target and mixed Specs and Embs not Match! Check its"
         assert len(self.target_spec_list) != 0, " Training files not found !"
@@ -53,7 +54,7 @@ def train_dataloader(c, ap):
 
 def test_dataloader(c, ap):
     return DataLoader(dataset=Dataset(c, ap, train=False),
-                          collate_fn=test_collate, batch_size=c.test_config['batch_size'], 
+                          collate_fn=test_collate_fn, batch_size=c.test_config['batch_size'], 
                           shuffle=False, num_workers=c.test_config['num_workers'])
 
 def train_collate_fn(item):
