@@ -92,7 +92,8 @@ def si_snr_loss(x, s, eps=1e-8):
     s_zm = s - torch.mean(s, dim=-1, keepdim=True)
     t = torch.sum(x_zm * s_zm, dim=-1,
                 keepdim=True) * s_zm / (l2norm(s_zm, keepdim=True)**2 + eps)
-    return 20 * torch.log10(eps + l2norm(t) / (l2norm(x_zm - t) + eps))
+    si_snr = 20 * torch.log10(eps + l2norm(t) / (l2norm(x_zm - t) + eps))
+    return -th.sum(si_snr)/x.size(0)
 
 def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
     model.eval()
