@@ -63,14 +63,36 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
 def glob_re_to_filename(dire, glob, num):
     return os.path.join(dire, glob.replace('*', '%06d' % num))
 
+# losses 
 def powerlaw_compressed_loss(criterion, output, interference, power, complex_loss_ratio):
     # criterion is nn.MSELoss() instance
     # Power-law compressed loss
     spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(interference), power))
     complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(interference, min=0.0), power))
     loss = spec_loss + (complex_loss * complex_loss_ratio)
-
     return loss
+
+# adpted from https://github.com/funcwj/voice-filter/blob/23d8cf159b8fad4dbf2dac0cf26f28b922c6ee01/nnet/libs/trainer.py#L337
+def si_snr_loss(x, s, eps=1e-8):
+    """
+    Arguments:
+    x: separated signal, N x S tensor
+    s: reference signal, N x S tensor
+    Return:
+    sisnr: N tensor
+    """
+    def l2norm(mat, keepdim=False):
+        return torch.norm(mat, dim=-1, keepdim=keepdim)
+
+    if x.shape != s.shape:
+        raise RuntimeError(
+            "Dimention mismatch when calculate si-snr, {} vs {}".format(
+                x.shape, s.shape))
+    x_zm = x - torch.mean(x, dim=-1, keepdim=True)
+    s_zm = s - torch.mean(s, dim=-1, keepdim=True)
+    t = torch.sum(x_zm * s_zm, dim=-1,
+                keepdim=True) * s_zm / (l2norm(s_zm, keepdim=True)**2 + eps)
+    return 20 * torch.log10(eps + l2norm(t) / (l2norm(x_zm - t) + eps))
 
 def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
     model.eval()
@@ -97,7 +119,7 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
             est_wav = ap.inv_spectrogram(est_mag)
             est_mask = est_mask[0].cpu().detach().numpy()
 
-            sdr = bss_eval_sources(interference_wav, est_wav, False)[0][0]
+            sdr = bss_eval_sources(clean_spec, est_wav, False)[0][0]
             tensorboard.log_evaluation(test_loss, sdr,
                                   mixed_wav, interference_wav, est_wav,
                                   mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
