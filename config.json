@@ -1,7 +1,7 @@
 {
     "dataset":{
-        "train_dir":"",
-        "test_dir":"",
+        "train_dir":"../../LibriSpeech/voicefilter_data/train",
+        "test_dir":"../../LibriSpeech/voicefilter_data/test",
         "format":{ // format for glob search
             "emb": "*-emb.pt",
             "mixed":"*-target.pt",
@@ -20,10 +20,10 @@
         "epochs": 1000,
         "learning_rate": 1e-2,
         "optimizer":"adam",
-        "batch_size": 12,
-        "seed": 1234,
+        "batch_size": 8,
+        "seed": 42,
         "num_workers": 14,
-        "logs_path": "checkpoints/",
+        "logs_path": "../checkpoints/voicefilter-fixSRN",
         "reinit_layers": null,
         "summary_interval": 2,
         "checkpoint_interval": 800
@@ -34,9 +34,9 @@
     },
     "model":{
         "lstm_dim": 400,
-        "fc1_dim:": 600,
-        "fc2_dim:": 513, // = audio.backend.num_freq 513 for waveglow and 1024 for wavernn 
-        "emb_dim": 80 // 256 for GE2E encoder and 80 for Speech2Phone
+        "fc1_dim": 600,
+        "fc2_dim": 601, // = audio.backend.num_freq 513 for waveglow and 1024 for wavernn  601 for voicefilter
+        "emb_dim": 256 // 256 for GE2E encoder and 80 for Speech2Phone
     },  
     "audio": {
         "backend":"voicefilter", // waveglow or wavernn or voicefilter for datasets with sample rate > 16khz waveglow is recommend because de sythesis is better

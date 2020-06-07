@@ -41,6 +41,8 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                 raise RuntimeError
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
             model.load_state_dict(checkpoint['model'])
+            if cuda:
+                model = model.cuda()
         except:
             print(" > Partial model initialization.")
             model_dict = model.state_dict()
