@@ -99,7 +99,7 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
     model.eval()
     with torch.no_grad():
         for batch in testloader:
-            emb, clean_spec, mixed_spec, interference_wav, mixed_wav = batch[0]
+            emb, clean_spec, mixed_spec, target_wav, mixed_wav = batch[0]
 
             emb = emb.unsqueeze(0)
             clean_spec = clean_spec.unsqueeze(0)
@@ -120,9 +120,9 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
             est_wav = ap.inv_spectrogram(est_mag)
             est_mask = est_mask[0].cpu().detach().numpy()
 
-            sdr = bss_eval_sources(clean_spec, est_wav, False)[0][0]
+            sdr = bss_eval_sources(clean_spec, est_mag, False)[0][0]
             tensorboard.log_evaluation(test_loss, sdr,
-                                  mixed_wav, interference_wav, est_wav,
+                                  mixed_wav, target_wav, est_wav,
                                   mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
                                   step)
             break
