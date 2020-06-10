@@ -80,10 +80,9 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
             mask = model(mixed, emb)
             output = mixed * mask
 
+            #loss = criterion(output, target)
             # Calculate Power-Law compressed loss
-            loss = powerlaw_compressed_loss(criterion, output, target, power, complex_ratio)
-
-            loss = criterion(output, target)
+            loss = powerlaw_compressed_loss(criterion, output, target, power, complex_ratio)            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
