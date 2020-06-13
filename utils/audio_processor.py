@@ -45,6 +45,8 @@ class WrapperAudioProcessor(object):
     def load_wav(self, path):
         return self.ap.load_wav(path)
 
+    def get_mel(self, wav):
+        return self.ap.get_mel(wav)
 
 class WaveRNNAudioProcessor(object):
     """
