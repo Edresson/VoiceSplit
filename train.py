@@ -15,7 +15,7 @@ from utils.tensorboard import TensorboardWriter
 
 from utils.dataset import train_dataloader, test_dataloader
 
-from utils.generic_utils import validation, powerlaw_compressed_loss
+from utils.generic_utils import validation, PowerLaw_Compressed_Loss
 
 from models.voicefilter.model import VoiceFilter
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
@@ -65,6 +65,8 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     # composte loss
     criterion = nn.MSELoss()
     #criterion = nn.L1Loss()
+    
+    #criterion_PL = PowerLaw_Compressed_Loss(power, complex_ratio)
 
     # definitions for power-law compressed loss
     power = c.loss['power']
@@ -80,9 +82,10 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
             mask = model(mixed, emb)
             output = mixed * mask
 
-            #loss = criterion(output, target)
+            loss = criterion(output, target)
             # Calculate Power-Law compressed loss
-            loss = powerlaw_compressed_loss(criterion, output, target, power, complex_ratio)            
+            #loss = criterion_PL(output, target)
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

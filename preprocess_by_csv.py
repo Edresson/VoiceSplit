@@ -62,20 +62,20 @@ if __name__ == '__main__':
     if args.librispeech:
         for c, e, i in train_data_csv:
             splits = c.split('-')
-            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'.wav')
+            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
             splits = e.split('-')
-            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
+            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'-norm.wav')
             splits = i.split('-')
-            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
+            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
             train_data.append([target_path, emb_ref_path, interference_path])
         
         for c, e, i in test_data_csv:
             splits = c.split('-')
-            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'.wav')
+            target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
             splits = e.split('-')
-            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'.wav')
+            emb_ref_path = os.path.join(dataset_root_dir, splits[0], splits[1], e+'-norm.wav')
             splits = i.split('-')
-            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'.wav')           
+            interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
             test_data.append([target_path, emb_ref_path, interference_path])
     else:
         for c, e, i in train_data_csv:

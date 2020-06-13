@@ -64,13 +64,26 @@ def glob_re_to_filename(dire, glob, num):
     return os.path.join(dire, glob.replace('*', '%06d' % num))
 
 # losses 
-def powerlaw_compressed_loss(criterion, output, interference, power, complex_loss_ratio):
-    # criterion is nn.MSELoss() instance
-    # Power-law compressed loss
-    spec_loss = criterion(torch.pow(torch.abs(output), power), torch.pow(torch.abs(interference), power))
-    complex_loss = criterion(torch.pow(torch.clamp(output, min=0.0), power), torch.pow(torch.clamp(interference, min=0.0), power))
-    loss = spec_loss + (complex_loss * complex_loss_ratio)
-    return loss
+class PowerLaw_Compressed_Loss(nn.Module):
+    def __init__(self, power=0.3, complex_loss_ratio=0.113):
+        super(PowerLaw_Compressed_Loss, self).__init__()
+        self.power = power
+        self.complex_loss_ratio = complex_loss_ratio
+        self.criterion = nn.MSELoss()
+
+    def forward(self, prediction, target):
+        #loss = self.criterion( prediction, target)
+        #print("predict:", prediction)
+        prediction = torch.pow(prediction, self.power)
+        
+        #print("predicit depois", prediction)
+        target = torch.pow(target, self.power)
+        spec_loss = self.criterion(torch.abs(target), torch.abs(prediction))
+        #complex_loss = self.criterion(torch.pow(torch.clamp(prediction, min=0.0), self.power), torch.pow(torch.clamp(target, min=0.0), self.power))
+        complex_loss = self.criterion(target, prediction)
+        loss = spec_loss + (complex_loss * self.complex_loss_ratio)
+
+        return loss
 
 # adpted from https://github.com/funcwj/voice-filter/blob/23d8cf159b8fad4dbf2dac0cf26f28b922c6ee01/nnet/libs/trainer.py#L337
 def si_snr_loss(x, s, eps=1e-8):
