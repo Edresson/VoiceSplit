@@ -22,9 +22,9 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
         'wav files must be mono, not stereo'
 
     # trim initial and end  wave file silence using librosa
-    #emb_audio, _ = librosa.effects.trim(emb_audio, top_db=20)
-    #clean_audio, _ = librosa.effects.trim(clean_audio, top_db=20)
-    #interference, _ = librosa.effects.trim(interference, top_db=20)
+    emb_audio, _ = librosa.effects.trim(emb_audio, top_db=20)
+    clean_audio, _ = librosa.effects.trim(clean_audio, top_db=20)
+    interference, _ = librosa.effects.trim(interference, top_db=20)
 
     # calculate frames using audio necessary for config.audio['audio_len'] seconds
     audio_len_seconds = int(sample_rate * audio_len)

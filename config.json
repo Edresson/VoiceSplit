@@ -4,8 +4,8 @@
         "test_dir":"../../LibriSpeech/voicefilter_data/test",
         "format":{ // format for glob search
             "emb": "*-emb.pt",
-            "mixed":"*-target.pt",
-            "target":"*-mixed.pt",
+            "mixed":"*-mixed.pt",
+            "target":"*-target.pt",
             "emb_wav":"*-ref_emb.wav",
             "target_wav":"*-target.wav",
             "mixed_wav": "*-mixed.wav"
