@@ -75,45 +75,47 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     for _ in range(c.train_config['epochs']):
         model.train()
         for emb, target, mixed in trainloader:
-            if cuda:
-                target = target.cuda()
-                mixed = mixed.cuda()
-                emb = emb.cuda()
-            mask = model(mixed, emb)
-            output = mixed * mask
+            try:
+                if cuda:
+                    target = target.cuda()
+                    mixed = mixed.cuda()
+                    emb = emb.cuda()
+                mask = model(mixed, emb)
+                output = mixed * mask
 
-            loss = criterion(output, target)
-            # Calculate Power-Law compressed loss
-            #loss = criterion_PL(output, target)
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            step += 1
+                loss = criterion(output, target)
+                # Calculate Power-Law compressed loss
+                #loss = criterion_PL(output, target)
+                
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                step += 1
 
-            loss = loss.item()
-            if loss > 1e8 or math.isnan(loss):
-                print("Loss exploded to %.02f at step %d!" % (loss, step))
-                break
+                loss = loss.item()
+                if loss > 1e8 or math.isnan(loss):
+                    print("Loss exploded to %.02f at step %d!" % (loss, step))
+                    break
 
-            # write loss to tensorboard
-            if step % c.train_config['summary_interval'] == 0:
-                tensorboard.log_training(loss, step)
-                print("Write summary at step %d" % step)
+                # write loss to tensorboard
+                if step % c.train_config['summary_interval'] == 0:
+                    tensorboard.log_training(loss, step)
+                    print("Write summary at step %d" % step)
 
-            # save checkpoint file  and evaluate and save sample to tensorboard
-            if step % c.train_config['checkpoint_interval'] == 0:
-                save_path = os.path.join(log_dir, 'checkpoint_%d.pt' % step)
-                torch.save({
-                    'model': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'step': step,
-                    'config_str': str(c),
-                }, save_path)
-                print("Saved checkpoint to: %s" % save_path)
-                validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
-                model.train()
-
+                # save checkpoint file  and evaluate and save sample to tensorboard
+                if step % c.train_config['checkpoint_interval'] == 0:
+                    save_path = os.path.join(log_dir, 'checkpoint_%d.pt' % step)
+                    torch.save({
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'step': step,
+                        'config_str': str(c),
+                    }, save_path)
+                    print("Saved checkpoint to: %s" % save_path)
+                    validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
+                    model.train()
+            except:
+                print("Error, probably because the embedding reference is too small")
 
 
 
