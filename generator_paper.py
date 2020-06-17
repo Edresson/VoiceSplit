@@ -40,8 +40,6 @@ def mix(out_dir,hp, args, audio, num, s1_dvec, s1_target, s2):
     if d.shape[0] < 1.1 * hp.embedder.window * hp.audio.hop_length:
         return
 
-
-
     # I think random segment length will be better, but let's follow the paper first
     # fit audio to `hp.data.audio_len` seconds.
     # if merged audio is shorter than `L`, discard it

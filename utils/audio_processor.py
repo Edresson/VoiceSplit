@@ -30,14 +30,22 @@ class WrapperAudioProcessor(object):
         else:
             raise ValueError("Invalid AudioProcessor Backend: ")
 
-    def inv_spectrogram(self, spectrogram):
-        return self.ap.inv_spectrogram(spectrogram)
+    def inv_spectrogram(self, spectrogram, phase=None):
+        return self.ap.inv_spectrogram(spectrogram, phase)
 
     def get_spec_from_audio_path(self, audio_path):
         return self.ap.get_spec_from_audio_path(audio_path)
 
-    def get_spec_from_audio(self, audio):
-        return self.ap.get_spec_from_audio(audio)
+    def get_spec_from_audio(self, audio, return_phase=False):
+        spec = self.ap.get_spec_from_audio(audio)
+        if isinstance(spec, tuple) and return_phase:
+            return self.ap.get_spec_from_audio(audio)
+        elif isinstance(spec, tuple) and  not return_phase:
+            return self.ap.get_spec_from_audio(audio)[0]
+        elif not isinstance(spec, tuple) and return_phase:
+            return self.ap.get_spec_from_audio(audio), None
+
+        return spec
 
     def save_wav(self, wav, path):
         return self.ap.save_wav(wav, path)
@@ -204,7 +212,7 @@ class WaveRNNAudioProcessor(object):
         S = self._amp_to_db(self._linear_to_mel(np.abs(D))) - self.ref_level_db
         return self._normalize(S).T
 
-    def inv_spectrogram(self, spectrogram):
+    def inv_spectrogram(self, spectrogram, phase=None):
         if self.mel_spec:
             inv = self.inv_mel_spectrogram(spectrogram)
         else:
@@ -381,7 +389,7 @@ class WaveGlowAudioProcessor(object):
         return self.stft.mag_to_mel_spectrogram(y.T).T
 
     # Griffin-Lim
-    def inv_spectrogram(self, spectrogram):
+    def inv_spectrogram(self, spectrogram, phase=None):
         """Converts spectrogram to waveform using librosa"""
         spectrogram = spectrogram.T
         S = self.stft.spectral_de_normalize(spectrogram).cpu().detach().numpy()
@@ -459,14 +467,29 @@ class openVoiceFilterAudioProcessor():
     def wav2spec(self, y):
         D = self.stft(y)
         S = self.amp_to_db(np.abs(D)) - self.ref_level_db
-        S= self.normalize(S)
-        S = S.T # to make [time, freq]
-        return S
+        S, D = self.normalize(S), np.angle(D)
+        S, D = S.T, D.T # to make [time, freq]
+        return S, D
 
-    def spec2wav(self, spectrogram):
-        spectrogram = spectrogram.T
-        S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
-        return self._griffin_lim(S**self.power)
+    def istft_phase(self, mag, phase):
+        stft_matrix = mag * np.exp(1j*phase)
+        return librosa.istft(stft_matrix,
+                             hop_length=self.hop_length,
+                             win_length=self.win_length)
+    def spec2wav(self, spectrogram, phase=None):
+        if phase is not None:
+            print("Using Mixed Phase for spec2wav")
+            spectrogram, phase = spectrogram.T, phase.T
+            # used during inference only
+            # spectrogram: enhanced output
+            # phase: use noisy input's phase, so no GLA is required
+            S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
+            return self.istft_phase(S, phase)
+        else:
+            print("Using GL for spec2wav")
+            spectrogram = spectrogram.T
+            S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
+            return self._griffin_lim(S**self.power)
 
     def stft(self, y):
         return librosa.stft(y=y, n_fft=self.n_fft,
@@ -506,8 +529,8 @@ class openVoiceFilterAudioProcessor():
     def denormalize(self, S):
         return (np.clip(S, 0.0, 1.0) - 1.0) * -self.min_level_db
     
-    def inv_spectrogram(self, spectrogram):
-        return self.spec2wav(spectrogram)
+    def inv_spectrogram(self, spectrogram, phase=None):
+        return self.spec2wav(spectrogram, phase)
 
     def get_spec_from_audio_path(self, audio_path):
         return self.wav2spec(self.load_wav(audio_path))

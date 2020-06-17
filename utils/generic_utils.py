@@ -70,19 +70,20 @@ class PowerLaw_Compressed_Loss(nn.Module):
         self.power = power
         self.complex_loss_ratio = complex_loss_ratio
         self.criterion = nn.MSELoss()
+        self.epsilon = 1e-16 # use epsilon for prevent  gradient explosion
 
     def forward(self, prediction, target):
-        #loss = self.criterion( prediction, target)
-        #print("predict:", prediction)
-        prediction = torch.pow(prediction, self.power)
+        # prevent NAN loss
+        prediction = prediction + self.epsilon
+        target = target + self.epsilon
         
-        #print("predicit depois", prediction)
-        target = torch.pow(target, self.power)
-        spec_loss = self.criterion(torch.abs(target), torch.abs(prediction))
-        #complex_loss = self.criterion(torch.pow(torch.clamp(prediction, min=0.0), self.power), torch.pow(torch.clamp(target, min=0.0), self.power))
-        complex_loss = self.criterion(target, prediction)
-        loss = spec_loss + (complex_loss * self.complex_loss_ratio)
+        prediction = torch.pow(prediction, self.power)
+        target = torch.pow(target+1e-16, self.power)
 
+        spec_loss = self.criterion(torch.abs(target), torch.abs(prediction))
+        complex_loss = self.criterion(target, prediction)
+
+        loss = spec_loss + (complex_loss * self.complex_loss_ratio)
         return loss
 
 # adpted from https://github.com/funcwj/voice-filter/blob/23d8cf159b8fad4dbf2dac0cf26f28b922c6ee01/nnet/libs/trainer.py#L337
@@ -112,8 +113,8 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
     model.eval()
     with torch.no_grad():
         for batch in testloader:
-            emb, clean_spec, mixed_spec, clean_wav, mixed_wav = batch[0]
-
+            emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase = batch[0]
+    
             emb = emb.unsqueeze(0)
             clean_spec = clean_spec.unsqueeze(0)
             mixed_spec = mixed_spec.unsqueeze(0)
@@ -130,7 +131,7 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
             mixed_spec = mixed_spec[0].cpu().detach().numpy()
             clean_spec = clean_spec[0].cpu().detach().numpy()
             est_mag = est_mag[0].cpu().detach().numpy()
-            est_wav = ap.inv_spectrogram(est_mag)
+            est_wav = ap.inv_spectrogram(est_mag, phase=mixed_phase)
             est_mask = est_mask[0].cpu().detach().numpy()
 
             sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]

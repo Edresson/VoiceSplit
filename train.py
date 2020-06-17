@@ -61,31 +61,32 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     # convert model from cuda
     if cuda:
         model = model.cuda()
-    
-    # composte loss
-    criterion = nn.MSELoss()
-    #criterion = nn.L1Loss()
-    
-    #criterion_PL = PowerLaw_Compressed_Loss(power, complex_ratio)
 
     # definitions for power-law compressed loss
     power = c.loss['power']
     complex_ratio = c.loss['complex_loss_ratio']
 
+    # composte loss
+    #criterion_mse = nn.MSELoss()
+    #criterion = nn.L1Loss()
+    criterion = PowerLaw_Compressed_Loss(power, complex_ratio)
+
     for _ in range(c.train_config['epochs']):
+        #validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
         model.train()
         for emb, target, mixed in trainloader:
-            try:
+                #try:
                 if cuda:
                     target = target.cuda()
                     mixed = mixed.cuda()
+                    
                     emb = emb.cuda()
                 mask = model(mixed, emb)
                 output = mixed * mask
 
-                loss = criterion(output, target)
                 # Calculate Power-Law compressed loss
-                #loss = criterion_PL(output, target)
+                loss = criterion(output, target)
+                
                 
                 optimizer.zero_grad()
                 loss.backward()
@@ -114,8 +115,8 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                     print("Saved checkpoint to: %s" % save_path)
                     validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
                     model.train()
-            except:
-                print("Error, probably because the embedding reference is too small")
+                #except:
+                #print("Error, probably because the embedding reference is too small")
 
 
 

@@ -1,7 +1,7 @@
 {
     "dataset":{
-        "train_dir":"../../LibriSpeech/voicefilter_data/train",
-        "test_dir":"../../LibriSpeech/voicefilter_data/test",
+        "train_dir":"../../LibriSpeech/voicefilter-open-fiel-ao-paper-data/train",
+        "test_dir":"../../LibriSpeech/voicefilter-open-fiel-ao-paper-data/test",
         "format":{ // format for glob search
             "emb": "*-emb.pt",
             "mixed":"*-mixed.pt",
@@ -20,13 +20,13 @@
         "epochs": 1000,
         "learning_rate": 1e-2,
         "optimizer":"adam",
-        "batch_size": 8,
+        "batch_size": 24,
         "seed": 42,
         "num_workers": 14,
-        "logs_path": "../checkpoints/voicefilter-fixSRN",
+        "logs_path": "../checkpoints/voicesplit-continue-power-law-loss/",
         "reinit_layers": null,
         "summary_interval": 2,
-        "checkpoint_interval": 800
+        "checkpoint_interval": 500
     },
     "test_config": {
         "batch_size": 1,
@@ -90,7 +90,6 @@
             "preemphasis": 0.97,
             "power": 1.5,
             "griffin_lim_iters": 60
-
         }
 
     }

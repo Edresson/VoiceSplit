@@ -3,6 +3,7 @@ from glob import glob
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch import stack
+import numpy as np
 
 class Dataset(Dataset):
     """
@@ -34,14 +35,18 @@ class Dataset(Dataset):
             return torch.load(self.emb_list[idx]), torch.load(self.target_spec_list[idx]), torch.load(self.mixed_spec_list[idx])      
         else: # if test
             emb = torch.load(self.emb_list[idx])
-            target_spec = torch.load(self.target_spec_list[idx])
-            mixed_spec = torch.load(self.mixed_spec_list[idx])
+            # target_spec = torch.load(self.target_spec_list[idx])
+            # mixed_spec = torch.load(self.mixed_spec_list[idx])
             mixed_wav = self.ap.load_wav(self.mixed_wav_list[idx])
             target_wav = self.ap.load_wav(self.target_wav_list[idx])
-            return emb, target_spec, mixed_spec, target_wav, mixed_wav
+            mixed_spec, mixed_phase = self.ap.get_spec_from_audio(mixed_wav, return_phase=True)
+            target_spec, _ = self.ap.get_spec_from_audio(target_wav, return_phase=True)
+            target_spec = torch.from_numpy(target_spec)
+            mixed_spec = torch.from_numpy(mixed_spec)
+            return emb, target_spec, mixed_spec, target_wav, mixed_wav, mixed_phase
+
     def __len__(self):
         return len(self.emb_list)
-
 def train_dataloader(c, ap):
     return DataLoader(dataset=Dataset(c, ap, train=True),
                           batch_size=c.train_config['batch_size'],
@@ -62,13 +67,22 @@ def train_collate_fn(item):
     target_list = []
     mixed_list = []
     for emb, target, mixed in item:
+        #print(emb)
+        if emb.tolist() == [0]:
+            print("ignorado ", emb)
+            continue
         embs_list.append(emb)
         target_list.append(target)
         mixed_list.append(mixed)
     # concate tensors in dim 0
     target_list = stack(target_list, dim=0)
     mixed_list = stack(mixed_list, dim=0)
-    embs_list = stack(embs_list, dim=0)
+    try:
+        embs_list = stack(embs_list, dim=0)
+    except:
+        print('erro, stack')
+        embs_list = embs_list
+        #embs_list = torch.from_numpy(np.array(embs_list))
     return embs_list, target_list, mixed_list
 
 def test_collate_fn(batch):
