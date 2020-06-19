@@ -20,9 +20,8 @@ class Dataset(Dataset):
         self.emb_list = self.find_files_by_format(format_data['emb'])
         self.target_spec_list = self.find_files_by_format(format_data['target'])
         self.mixed_spec_list = self.find_files_by_format(format_data['mixed'])
-        if not train:
-            self.target_wav_list = self.find_files_by_format(format_data['target_wav'])
-            self.mixed_wav_list = self.find_files_by_format(format_data['mixed_wav'])
+        self.target_wav_list = self.find_files_by_format(format_data['target_wav'])
+        self.mixed_wav_list = self.find_files_by_format(format_data['mixed_wav'])
         # asserts for integrity
         assert len(self.emb_list) == len(self.target_spec_list) == len(self.mixed_spec_list), " The number of target and mixed Specs and Embs not Match! Check its"
         assert len(self.target_spec_list) != 0, " Training files not found !"
@@ -32,7 +31,14 @@ class Dataset(Dataset):
 
     def __getitem__(self, idx):
         if self.train:
-            return torch.load(self.emb_list[idx]), torch.load(self.target_spec_list[idx]), torch.load(self.mixed_spec_list[idx])      
+            mixed_wav = self.ap.load_wav(self.mixed_wav_list[idx])
+            mixed_spec, mixed_phase = self.ap.get_spec_from_audio(mixed_wav, return_phase=True)
+            target_wav = self.ap.load_wav(self.target_wav_list[idx])
+            seq_len = torch.from_numpy(np.array([mixed_wav.shape[0]]))
+            mixed_phase = torch.from_numpy(np.array(mixed_phase))
+            mixed_spec = torch.from_numpy(mixed_spec)
+            target_wav = torch.from_numpy(target_wav)
+            return torch.load(self.emb_list[idx]), torch.load(self.target_spec_list[idx]), mixed_spec, seq_len, target_wav, mixed_phase  
         else: # if test
             emb = torch.load(self.emb_list[idx])
             # target_spec = torch.load(self.target_spec_list[idx])
@@ -43,7 +49,8 @@ class Dataset(Dataset):
             target_spec, _ = self.ap.get_spec_from_audio(target_wav, return_phase=True)
             target_spec = torch.from_numpy(target_spec)
             mixed_spec = torch.from_numpy(mixed_spec)
-            return emb, target_spec, mixed_spec, target_wav, mixed_wav, mixed_phase
+            seq_len = torch.from_numpy(np.array([mixed_wav.shape[0]]))
+            return emb, target_spec, mixed_spec, target_wav, mixed_wav, mixed_phase, seq_len
 
     def __len__(self):
         return len(self.emb_list)
@@ -66,24 +73,33 @@ def train_collate_fn(item):
     embs_list = []
     target_list = []
     mixed_list = []
-    for emb, target, mixed in item:
+    seq_len_list = []
+    mixed_phase_list = []
+    target_wav_list = []
+    for emb, target, mixed, seq_len, target_wav, mixed_phase in item:
         #print(emb)
         if emb.tolist() == [0]:
-            print("ignorado ", emb)
+            #print("ignorado ", emb)
             continue
         embs_list.append(emb)
         target_list.append(target)
         mixed_list.append(mixed)
+        seq_len_list.append(seq_len)
+        mixed_phase_list.append(mixed_phase)
+        target_wav_list.append(target_wav)
+
     # concate tensors in dim 0
     target_list = stack(target_list, dim=0)
     mixed_list = stack(mixed_list, dim=0)
+    seq_len_list = stack(seq_len_list, dim=0)
+    target_wav_list = stack(target_wav_list, dim=0)
+    mixed_phase_list = stack(mixed_phase_list, dim=0) # np.array(mixed_phase_list)
     try:
         embs_list = stack(embs_list, dim=0)
     except:
-        print('erro, stack')
+        #print('erro, stack')
         embs_list = embs_list
-        #embs_list = torch.from_numpy(np.array(embs_list))
-    return embs_list, target_list, mixed_list
+    return embs_list, target_list, mixed_list, seq_len_list, target_wav_list, mixed_phase_list
 
 def test_collate_fn(batch):
         return batch

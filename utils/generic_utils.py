@@ -13,6 +13,10 @@ from scipy.signal import get_window
 from scipy.io.wavfile import read
 from mir_eval.separation import bss_eval_sources
 
+
+from itertools import permutations
+import torch.nn.functional as F
+
 def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path):
     data_out_dir = output_dir
     emb_audio, _ = librosa.load(embedding_utterance_path, sr=sample_rate)
@@ -72,13 +76,13 @@ class PowerLaw_Compressed_Loss(nn.Module):
         self.criterion = nn.MSELoss()
         self.epsilon = 1e-16 # use epsilon for prevent  gradient explosion
 
-    def forward(self, prediction, target):
+    def forward(self, prediction, target, seq_len=None, spec_phase=None):
         # prevent NAN loss
         prediction = prediction + self.epsilon
         target = target + self.epsilon
-        
+
         prediction = torch.pow(prediction, self.power)
-        target = torch.pow(target+1e-16, self.power)
+        target = torch.pow(target, self.power)
 
         spec_loss = self.criterion(torch.abs(target), torch.abs(prediction))
         complex_loss = self.criterion(target, prediction)
@@ -86,35 +90,113 @@ class PowerLaw_Compressed_Loss(nn.Module):
         loss = spec_loss + (complex_loss * self.complex_loss_ratio)
         return loss
 
-# adpted from https://github.com/funcwj/voice-filter/blob/23d8cf159b8fad4dbf2dac0cf26f28b922c6ee01/nnet/libs/trainer.py#L337
-def si_snr_loss(x, s, eps=1e-8):
-    """
-    Arguments:
-    x: separated signal, N x S tensor
-    s: reference signal, N x S tensor
-    Return:
-    sisnr: N tensor
-    """
-    def l2norm(mat, keepdim=False):
-        return torch.norm(mat, dim=-1, keepdim=keepdim)
+# adapted from https://github.com/digantamisra98/Mish/blob/master/Mish/Torch/mish.py
+class Mish(nn.Module):
+    '''
+    Applies the mish function element-wise:
+    mish(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x)))
+    Shape:
+        - Input: (N, *) where * means, any number of additional
+          dimensions
+        - Output: (N, *), same shape as the input
+    Examples:
+        >>> m = Mish()
+        >>> input = torch.randn(2)
+        >>> output = m(input)
+    '''
+    def __init__(self):
+        '''
+        Init method.
+        '''
+        super().__init__()
 
-    if x.shape != s.shape:
-        raise RuntimeError(
-            "Dimention mismatch when calculate si-snr, {} vs {}".format(
-                x.shape, s.shape))
-    x_zm = x - torch.mean(x, dim=-1, keepdim=True)
-    s_zm = s - torch.mean(s, dim=-1, keepdim=True)
-    t = torch.sum(x_zm * s_zm, dim=-1,
-                keepdim=True) * s_zm / (l2norm(s_zm, keepdim=True)**2 + eps)
-    si_snr = 20 * torch.log10(eps + l2norm(t) / (l2norm(x_zm - t) + eps))
-    return -th.sum(si_snr)/x.size(0)
+    def forward(self, inp):
+        '''
+        Forward pass of the function.
+        '''
+        return inp * torch.tanh(F.softplus(inp))
 
-def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
+
+# adpted from https://github.com/kaituoxu/Conv-TasNet/blob/master/src/pit_criterion.py
+def get_mask(source, source_lengths):
+    """
+    Args:
+        source: [B, C, T]
+        source_lengths: [B]
+    Returns:
+        mask: [B, 1, T]
+    """
+    B, _, T = source.size()
+    mask = source.new_ones((B, 1, T))
+    for i in range(B):
+        mask[i, :, source_lengths[i]:] = 0
+    return mask
+
+class SiSNR_With_Pit(nn.Module):
+    def __init__(self):
+        super(SiSNR_With_Pit, self).__init__()
+        self.epsilon = 1e-16 # use epsilon for prevent  gradient explosion
+    def forward(self, source, estimate_source, source_lengths):
+        """
+        Calculate SI-SNR with PIT training.
+        Args:
+            source: [B, C, T], B is batch size
+            estimate_source: [B, C, T]
+            source_lengths: [B], each item is between [0, T]
+        """
+        # get wav from spec phase
+        assert source.size() == estimate_source.size()
+        
+        B, C, T = source.size()
+        # mask padding position along T
+        mask = get_mask(source, source_lengths)
+        estimate_source *= mask
+
+        # Step 1. Zero-mean norm
+        num_samples = source_lengths.view(-1, 1, 1).float()  # [B, 1, 1]
+        mean_target = torch.sum(source, dim=2, keepdim=True) / num_samples
+        mean_estimate = torch.sum(estimate_source, dim=2, keepdim=True) / num_samples
+        zero_mean_target = source - mean_target
+        zero_mean_estimate = estimate_source - mean_estimate
+        # mask padding position along T
+        zero_mean_target *= mask
+        zero_mean_estimate *= mask
+
+        # Step 2. SI-SNR with PIT
+        # reshape to use broadcast
+        s_target = torch.unsqueeze(zero_mean_target, dim=1)  # [B, 1, C, T]
+        s_estimate = torch.unsqueeze(zero_mean_estimate, dim=2)  # [B, C, 1, T]
+        # s_target = <s', s>s / ||s||^2
+        pair_wise_dot = torch.sum(s_estimate * s_target, dim=3, keepdim=True)  # [B, C, C, 1]
+        s_target_energy = torch.sum(s_target ** 2, dim=3, keepdim=True) + self.epsilon  # [B, 1, C, 1]
+        pair_wise_proj = pair_wise_dot * s_target / s_target_energy  # [B, C, C, T]
+        # e_noise = s' - s_target
+        e_noise = s_estimate - pair_wise_proj  # [B, C, C, T]
+        # SI-SNR = 10 * log_10(||s_target||^2 / ||e_noise||^2)
+        pair_wise_si_snr = torch.sum(pair_wise_proj ** 2, dim=3) / (torch.sum(e_noise ** 2, dim=3) + self.epsilon)
+        pair_wise_si_snr = 10 * torch.log10(pair_wise_si_snr + self.epsilon)  # [B, C, C]
+
+        # Get max_snr of each utterance
+        # permutations, [C!, C]
+        perms = source.new_tensor(list(permutations(range(C))), dtype=torch.long)
+        # one-hot, [C!, C, C]
+        index = torch.unsqueeze(perms, 2)
+        perms_one_hot = source.new_zeros((*perms.size(), C)).scatter_(2, index, 1)
+        # [B, C!] <- [B, C, C] einsum [C!, C, C], SI-SNR sum of each permutation
+        snr_set = torch.einsum('bij,pij->bp', [pair_wise_si_snr, perms_one_hot])
+        max_snr_idx = torch.argmax(snr_set, dim=1)  # [B]
+        # max_snr = torch.gather(snr_set, 1, max_snr_idx.view(-1, 1))  # [B, 1]
+        max_snr, _ = torch.max(snr_set, dim=1, keepdim=True)
+        max_snr /= C
+        loss = 20 - torch.mean(max_snr) # i use 20 because 20 is very high value
+        return loss
+
+def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, loss_name='si_snr'):
     model.eval()
     with torch.no_grad():
         for batch in testloader:
-            emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase = batch[0]
-    
+            emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase, seq_len = batch[0]
+
             emb = emb.unsqueeze(0)
             clean_spec = clean_spec.unsqueeze(0)
             mixed_spec = mixed_spec.unsqueeze(0)
@@ -123,22 +205,26 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True):
                 emb = emb.cuda()
                 clean_spec = clean_spec.cuda()
                 mixed_spec = mixed_spec.cuda()
-        
+
             est_mask = model(mixed_spec, emb)
             est_mag = est_mask * mixed_spec
-            test_loss = criterion(clean_spec, est_mag).item()
-
+            if loss_name == 'power_law_compression':
+                test_loss = criterion(clean_spec, est_mag, seq_len).item()
             mixed_spec = mixed_spec[0].cpu().detach().numpy()
             clean_spec = clean_spec[0].cpu().detach().numpy()
             est_mag = est_mag[0].cpu().detach().numpy()
+
             est_wav = ap.inv_spectrogram(est_mag, phase=mixed_phase)
             est_mask = est_mask[0].cpu().detach().numpy()
-
+            if loss_name == 'si_snr':
+                test_loss = criterion(torch.from_numpy(np.array([[clean_wav]])), torch.from_numpy(np.array([[est_wav]])), seq_len).item()
             sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]
             tensorboard.log_evaluation(test_loss, sdr,
                                   mixed_wav, clean_wav, est_wav,
                                   mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
                                   step)
+            print("Validation Loss:", test_loss)
+            print("Validation SDR:", sdr)
             break
 
 class AttrDict(dict):

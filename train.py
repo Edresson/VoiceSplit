@@ -5,6 +5,7 @@ import torch.nn as nn
 import traceback
 
 import time
+import numpy as np
 
 import argparse
 
@@ -15,17 +16,19 @@ from utils.tensorboard import TensorboardWriter
 
 from utils.dataset import train_dataloader, test_dataloader
 
-from utils.generic_utils import validation, PowerLaw_Compressed_Loss
+from utils.generic_utils import validation, PowerLaw_Compressed_Loss, SiSNR_With_Pit
 
 from models.voicefilter.model import VoiceFilter
+from models.voicesplit.model import VoiceSplit
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
 
 def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
         model = VoiceFilter(c)
-    # elif():
+    elif(model_name == 'voicesplit'):
+        model = VoiceSplit(c)
     else:
-        print(" The model '",model_name, "' is not suported")
+        raise Exception(" The model '"+model_name+"' is not suported")
 
     if c.train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(),
@@ -49,7 +52,6 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
             model_dict = set_init_dict(model_dict, checkpoint, c)
             model.load_state_dict(model_dict)
             del model_dict
-            
         try:
             optimizer.load_state_dict(checkpoint['optimizer'])
         except:
@@ -69,25 +71,41 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
     # composte loss
     #criterion_mse = nn.MSELoss()
     #criterion = nn.L1Loss()
-    criterion = PowerLaw_Compressed_Loss(power, complex_ratio)
+    if c.loss['loss_name'] == 'power_law_compression':
+        criterion = PowerLaw_Compressed_Loss(power, complex_ratio)
+    elif c.loss['loss_name'] == 'si_snr':
+        criterion = SiSNR_With_Pit()
+    else:
+        raise Exception(" The loss '"+c.loss['loss_name']+"' is not suported")
 
     for _ in range(c.train_config['epochs']):
-        #validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda)
+        validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda, loss_name=c.loss['loss_name'] )
+        #break
         model.train()
-        for emb, target, mixed in trainloader:
+        for emb, target, mixed, seq_len, target_wav, spec_phase in trainloader:
                 #try:
                 if cuda:
+                    emb = emb.cuda()
                     target = target.cuda()
                     mixed = mixed.cuda()
-                    
-                    emb = emb.cuda()
+                    seq_len = seq_len.cuda()
+                    spec_phase = spec_phase.cuda()
+
                 mask = model(mixed, emb)
                 output = mixed * mask
 
-                # Calculate Power-Law compressed loss
-                loss = criterion(output, target)
+                if c.loss['loss_name'] == 'si_snr':
+                    # convert spec to wav using phase
+                    output = ap.torch_inv_spectrogram(output, spec_phase)
+                    target = ap.torch_inv_spectrogram(target, spec_phase)
+                    shape = list(target.shape)
+                    target = torch.reshape(target, [shape[0],1]+shape[1:]) # append channel dim
+                    output = torch.reshape(output, [shape[0],1]+shape[1:]) # append channel dim
+                else:
+                    seq_len = None
                 
-                
+                # Calculate loss
+                loss = criterion(output, target, seq_len)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -119,9 +137,6 @@ def train(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, 
                 #print("Error, probably because the embedding reference is too small")
 
 
-
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -131,16 +146,12 @@ if __name__ == '__main__':
                         help="json file with configurations")
     parser.add_argument('--checkpoint_path', type=str, default=None,
                         help="path of checkpoint pt file, for continue training")
-    parser.add_argument('-m', '--model', type=str, default='voicefilter',
-                        help="Name of the model. Used for model choise and for both logging and saving checkpoints. Valids values 'voicefilter' and voiceSplit")
     args = parser.parse_args()
 
     c = load_config(args.config_path)
     ap = AudioProcessor(c.audio)
 
-    
-
-    log_path = os.path.join(c.train_config['logs_path'], args.model)
+    log_path = os.path.join(c.train_config['logs_path'], c.model_name)
     os.makedirs(log_path, exist_ok=True)
     audio_config = c.audio[c.audio['backend']]
     tensorboard = TensorboardWriter(log_path, audio_config)
@@ -149,4 +160,4 @@ if __name__ == '__main__':
 
     train_dataloader = train_dataloader(c, ap)
     test_dataloader = test_dataloader(c, ap)
-    train(args, log_path, args.checkpoint_path, train_dataloader, test_dataloader, tensorboard, c, args.model, ap, cuda=True)
+    train(args, log_path, args.checkpoint_path, train_dataloader, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)

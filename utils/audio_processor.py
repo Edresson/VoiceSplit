@@ -12,7 +12,7 @@ from utils.generic_utils import load_wav_to_torch
 from scipy.io.wavfile import read
 from pprint import pprint
 from scipy import signal, io
-
+import torchaudio
 
 MAX_WAV_VALUE = 32768.0
 
@@ -33,6 +33,8 @@ class WrapperAudioProcessor(object):
     def inv_spectrogram(self, spectrogram, phase=None):
         return self.ap.inv_spectrogram(spectrogram, phase)
 
+    def torch_inv_spectrogram(self, spectrogram, phase=None):
+        return self.ap.torch_inv_spectrogram(spectrogram, phase)
     def get_spec_from_audio_path(self, audio_path):
         return self.ap.get_spec_from_audio_path(audio_path)
 
@@ -465,6 +467,8 @@ class openVoiceFilterAudioProcessor():
         return mel
 
     def wav2spec(self, y):
+        audio_class = torchaudio.transforms.Spectrogram(n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length)#, window_fn=torch.hamming_window(self.n_fft,periodic=False, alpha=0.5, beta=0.5))
+        self.torch_spec = audio_class(torch.from_numpy(y))
         D = self.stft(y)
         S = self.amp_to_db(np.abs(D)) - self.ref_level_db
         S, D = self.normalize(S), np.angle(D)
@@ -478,7 +482,7 @@ class openVoiceFilterAudioProcessor():
                              win_length=self.win_length)
     def spec2wav(self, spectrogram, phase=None):
         if phase is not None:
-            print("Using Mixed Phase for spec2wav")
+            #print("Using Mixed Phase for spec2wav")
             spectrogram, phase = spectrogram.T, phase.T
             # used during inference only
             # spectrogram: enhanced output
@@ -486,10 +490,23 @@ class openVoiceFilterAudioProcessor():
             S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
             return self.istft_phase(S, phase)
         else:
-            print("Using GL for spec2wav")
+            #print("Using GL for spec2wav")
             spectrogram = spectrogram.T
             S = self.db_to_amp(self.denormalize(spectrogram) + self.ref_level_db)
             return self._griffin_lim(S**self.power)
+
+    def torch_spec2wav(self, spectrogram, phase=None):
+        spectrogram = spectrogram.transpose(2,1)
+        phase = phase.transpose(2,1)
+        # denormalise spectrogram
+        S =  (torch.clamp(spectrogram, 0.0, 1.0) - 1.0) * -self.min_level_db
+        S = S + self.ref_level_db
+        # db_to_amp
+        stft_matrix = torch.pow(10.0, S * 0.05)
+        # invert phase
+        phase = torch.stack([phase.cos(), phase.sin()], dim=-1).to(dtype=stft_matrix.dtype, device=stft_matrix.device)
+        stft_matrix = stft_matrix.unsqueeze(-1).expand_as(phase)
+        return torchaudio.functional.istft(stft_matrix * torch.exp(phase), self.n_fft, hop_length=self.hop_length, win_length=self.win_length, window=torch.hamming_window(self.win_length, periodic=False, alpha=0.5, beta=0.5).to(device=stft_matrix.device), center=True, normalized=False, onesided=True, length=None)
 
     def stft(self, y):
         return librosa.stft(y=y, n_fft=self.n_fft,
@@ -531,6 +548,9 @@ class openVoiceFilterAudioProcessor():
     
     def inv_spectrogram(self, spectrogram, phase=None):
         return self.spec2wav(spectrogram, phase)
+
+    def torch_inv_spectrogram(self, spectrogram, phase=None):
+        return self.torch_spec2wav(spectrogram, phase)
 
     def get_spec_from_audio_path(self, audio_path):
         return self.wav2spec(self.load_wav(audio_path))

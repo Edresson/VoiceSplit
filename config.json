@@ -1,4 +1,5 @@
 {
+    "model_name":"voicesplit", // voicefilter and voicesplit
     "dataset":{
         "train_dir":"../../LibriSpeech/voicefilter-open-fiel-ao-paper-data/train",
         "test_dir":"../../LibriSpeech/voicefilter-open-fiel-ao-paper-data/test",
@@ -13,6 +14,7 @@
 
     },
     "loss":{
+        "loss_name":"si_snr", // si_snr or power_law_compression  si_snr for voicesplit and power_law_compression for voicefilter
         "power": 0.30,
         "complex_loss_ratio":0.113 // \lambda  best value in paper https://arxiv.org/pdf/1811.07030.pdf
     },
@@ -20,10 +22,10 @@
         "epochs": 1000,
         "learning_rate": 1e-2,
         "optimizer":"adam",
-        "batch_size": 24,
+        "batch_size": 2,
         "seed": 42,
         "num_workers": 14,
-        "logs_path": "../checkpoints/voicesplit-continue-power-law-loss/",
+        "logs_path": "../checkpoints/voicesplit-continue-si-snr/",
         "reinit_layers": null,
         "summary_interval": 2,
         "checkpoint_interval": 500
