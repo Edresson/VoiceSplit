@@ -226,8 +226,8 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, l
                                     mixed_wav, clean_wav, est_wav,
                                     mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
                                     step)
-                    print("Validation Loss:", test_loss)
-                    print("Validation SDR:", sdr)
+                print("Validation Loss:", test_loss)
+                print("Validation SDR:", sdr)
                 break
             sdrs.append(sdr)
             losses.append(test_loss)

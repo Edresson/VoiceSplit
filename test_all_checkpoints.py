@@ -120,8 +120,9 @@ if __name__ == '__main__':
         if mean_sdr > best_sdr:
             best_sdr = mean_sdr
             best_sdr_checkpoint = checkpoint
+
     print("Best SDR checkpoint is: ", best_sdr_checkpoint, "Best Loss checkpoint is: ", best_loss_checkpoint, "Best SDR:",best_sdr, "Best Loss:", best_loss)
-    
+
     copyfile(best_sdr_checkpoint, os.path.join(args.checkpoints_path,'best_checkpoint.pt'))
 
     np.save(os.path.join(args.checkpoints_path,"SDRs_loss_validation_with_VCTK_best_SDR_is_"+str(best_sdr)+".np"), np.array(sdrs_checkpoint))
