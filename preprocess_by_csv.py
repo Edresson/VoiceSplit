@@ -17,10 +17,16 @@ import pandas as  pd
 if __name__ == '__main__':
     def train_wrapper(num):
         clean_utterance_path, embedding_utterance_path, interference_utterance_path = train_data[num]
-        mix_wavfiles(output_dir_train, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
+        try:
+            mix_wavfiles(output_dir_train, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
+        except:
+            print("Error, probabily because one  of this samples don't exist, samples: ", clean_utterance_path, embedding_utterance_path, interference_utterance_path)
     def test_wrapper(num):
         clean_utterance_path, embedding_utterance_path, interference_utterance_path = test_data[num]
-        mix_wavfiles(output_dir_test, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
+        try:
+            mix_wavfiles(output_dir_test, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path)
+        except:
+            print("Error, probabily because one  of this samples don't exist, samples: ", clean_utterance_path, embedding_utterance_path, interference_utterance_path)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, required=True,
