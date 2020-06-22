@@ -7,3 +7,4 @@ Pillow
 torch==1.0.1
 tensorboardX
 pandas
+torchaudio

@@ -57,8 +57,8 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
     librosa.output.write_wav(mixed_wav_path, mixed_audio, sample_rate)
 
     # extract and save spectrograms
-    clean_spec = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
-    mixed_spec = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec, _ = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec, _ = ap.get_spec_from_audio_path(mixed_wav_path)
     clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num)
     mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num)
     torch.save(torch.from_numpy(clean_spec), clean_spec_path)
@@ -191,7 +191,9 @@ class SiSNR_With_Pit(nn.Module):
         loss = 20 - torch.mean(max_snr) # i use 20 because 20 is very high value
         return loss
 
-def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, loss_name='si_snr'):
+def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, loss_name='si_snr', test=False):
+    sdrs = []
+    losses = []
     model.eval()
     with torch.no_grad():
         for batch in testloader:
@@ -219,14 +221,22 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, l
             if loss_name == 'si_snr':
                 test_loss = criterion(torch.from_numpy(np.array([[clean_wav]])), torch.from_numpy(np.array([[est_wav]])), seq_len).item()
             sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]
-            tensorboard.log_evaluation(test_loss, sdr,
-                                  mixed_wav, clean_wav, est_wav,
-                                  mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
-                                  step)
-            print("Validation Loss:", test_loss)
-            print("Validation SDR:", sdr)
-            break
-
+            if not test:
+                tensorboard.log_evaluation(test_loss, sdr,
+                                    mixed_wav, clean_wav, est_wav,
+                                    mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
+                                    step)
+                    print("Validation Loss:", test_loss)
+                    print("Validation SDR:", sdr)
+                break
+            sdrs.append(sdr)
+            losses.append(test_loss)
+        if test:
+            mean_test_loss = np.array(losses).mean()
+            mean_sdr = np.array(sdrs).mean()
+            print("Mean Test Loss:", mean_test_loss)
+            print("Mean Test SDR:", mean_sdr)
+            return mean_test_loss, mean_sdr
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
@@ -243,6 +253,13 @@ def load_config(config_path):
     config.update(data)
     return config
 
+def load_config_from_str(input_str):
+    config = AttrDict()
+    input_str = re.sub(r'\\\n', '', input_str)
+    input_str = re.sub(r'//.*\n', '\n', input_str)
+    data = json.loads(input_str)
+    config.update(data)
+    return config
 
 def copy_config_file(config_file, out_path, new_fields):
     config_lines = open(config_file, "r").readlines()

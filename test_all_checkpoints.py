@@ -3,9 +3,12 @@ import math
 import torch
 import torch.nn as nn
 import traceback
+from glob import glob
 
 import time
 import numpy as np
+
+import tqdm
 
 import argparse
 
@@ -21,6 +24,8 @@ from utils.generic_utils import validation, PowerLaw_Compressed_Loss, SiSNR_With
 from models.voicefilter.model import VoiceFilter
 from models.voicesplit.model import VoiceSplit
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
+
+from shutil import copyfile
 
 def test(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
@@ -78,14 +83,15 @@ if __name__ == '__main__':
                         help="Root directory of run.")
     parser.add_argument('-c', '--config_path', type=str, required=False, default=None,
                         help="json file with configurations")
-    parser.add_argument('--checkpoint_path', type=str, required=True,
+    parser.add_argument('--checkpoints_path', type=str, required=True,
                         help="path of checkpoint pt file, for continue training")
     args = parser.parse_args()
 
+    all_checkpoints = sorted(glob(os.path.join(args.checkpoints_path, '*.pt')))
     if args.config_path:
         c = load_config(args.config_path)
     else: #load config in checkpoint
-        checkpoint = torch.load(args.checkpoint_path, map_location='cpu')
+        checkpoint = torch.load(all_checkpoints[0], map_location='cpu')
         c = load_config_from_str(checkpoint['config_str'])
 
     ap = AudioProcessor(c.audio)
@@ -97,4 +103,25 @@ if __name__ == '__main__':
     c.dataset['test_dir'] = args.dataset_dir
 
     test_dataloader = test_dataloader(c, ap)
-    mean_loss, mean_sdr = test(args, log_path, args.checkpoint_path, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
+
+    best_sdr = 0
+    best_loss = 999999999
+    best_sdr_checkpoint = ''
+    best_loss_checkpoint = ''
+    sdrs_checkpoint = []
+    
+    for i in tqdm.tqdm(range(len(all_checkpoints))):
+        checkpoint = all_checkpoints[i]
+        mean_loss, mean_sdr = test(args, log_path, checkpoint, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
+        sdrs_checkpoint.append([mean_sdr, mean_loss, checkpoint])
+        if mean_loss < best_loss:
+            best_loss = mean_loss
+            best_loss_checkpoint = checkpoint
+        if mean_sdr > best_sdr:
+            best_sdr = mean_sdr
+            best_sdr_checkpoint = checkpoint
+    print("Best SDR checkpoint is: ", best_sdr_checkpoint, "Best Loss checkpoint is: ", best_loss_checkpoint, "Best SDR:",best_sdr, "Best Loss:", best_loss)
+    
+    copyfile(best_sdr_checkpoint, os.path.join(args.checkpoints_path,'best_checkpoint.pt'))
+
+    np.save(os.path.join(args.checkpoints_path,"SDRs_loss_validation_with_VCTK_best_SDR_is_"+str(best_sdr)+".np"), np.array(sdrs_checkpoint))
