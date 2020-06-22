@@ -22,7 +22,7 @@ from models.voicefilter.model import VoiceFilter
 from models.voicesplit.model import VoiceSplit
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
 
-def test(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, c, model_name, ap, cuda=True):
+def test(args, log_dir, checkpoint_path, testloader, tensorboard, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
         model = VoiceFilter(c)
     elif(model_name == 'voicesplit'):

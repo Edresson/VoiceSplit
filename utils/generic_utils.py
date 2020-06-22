@@ -16,6 +16,7 @@ from mir_eval.separation import bss_eval_sources
 
 from itertools import permutations
 import torch.nn.functional as F
+import yaml
 
 def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path):
     data_out_dir = output_dir
@@ -195,42 +196,48 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, l
     sdrs = []
     losses = []
     model.eval()
+    count = 0
     with torch.no_grad():
         for batch in testloader:
-            emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase, seq_len = batch[0]
+            try:
+                emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase, seq_len = batch[0]
 
-            emb = emb.unsqueeze(0)
-            clean_spec = clean_spec.unsqueeze(0)
-            mixed_spec = mixed_spec.unsqueeze(0)
+                emb = emb.unsqueeze(0)
+                clean_spec = clean_spec.unsqueeze(0)
+                mixed_spec = mixed_spec.unsqueeze(0)
 
-            if cuda:
-                emb = emb.cuda()
-                clean_spec = clean_spec.cuda()
-                mixed_spec = mixed_spec.cuda()
+                if cuda:
+                    emb = emb.cuda()
+                    clean_spec = clean_spec.cuda()
+                    mixed_spec = mixed_spec.cuda()
 
-            est_mask = model(mixed_spec, emb)
-            est_mag = est_mask * mixed_spec
-            if loss_name == 'power_law_compression':
-                test_loss = criterion(clean_spec, est_mag, seq_len).item()
-            mixed_spec = mixed_spec[0].cpu().detach().numpy()
-            clean_spec = clean_spec[0].cpu().detach().numpy()
-            est_mag = est_mag[0].cpu().detach().numpy()
+                est_mask = model(mixed_spec, emb)
+                est_mag = est_mask * mixed_spec
+                if loss_name == 'power_law_compression':
+                    test_loss = criterion(clean_spec, est_mag, seq_len).item()
+                mixed_spec = mixed_spec[0].cpu().detach().numpy()
+                clean_spec = clean_spec[0].cpu().detach().numpy()
+                est_mag = est_mag[0].cpu().detach().numpy()
 
-            est_wav = ap.inv_spectrogram(est_mag, phase=mixed_phase)
-            est_mask = est_mask[0].cpu().detach().numpy()
-            if loss_name == 'si_snr':
-                test_loss = criterion(torch.from_numpy(np.array([[clean_wav]])), torch.from_numpy(np.array([[est_wav]])), seq_len).item()
-            sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]
-            if not test:
-                tensorboard.log_evaluation(test_loss, sdr,
-                                    mixed_wav, clean_wav, est_wav,
-                                    mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
-                                    step)
-                print("Validation Loss:", test_loss)
-                print("Validation SDR:", sdr)
-                break
-            sdrs.append(sdr)
-            losses.append(test_loss)
+                est_wav = ap.inv_spectrogram(est_mag, phase=mixed_phase)
+                est_mask = est_mask[0].cpu().detach().numpy()
+                if loss_name == 'si_snr':
+                    test_loss = criterion(torch.from_numpy(np.array([[clean_wav]])), torch.from_numpy(np.array([[est_wav]])), seq_len).item()
+                sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]
+                if not test:
+                    tensorboard.log_evaluation(test_loss, sdr,
+                                        mixed_wav, clean_wav, est_wav,
+                                        mixed_spec.T, clean_spec.T, est_mag.T, est_mask.T,
+                                        step)
+                    print("Validation Loss:", test_loss)
+                    print("Validation SDR:", sdr)
+                    break
+                sdrs.append(sdr)
+                losses.append(test_loss)
+                count+=1
+                print(count, 'of',testloader.__len__())
+            except:
+                continue
         if test:
             mean_test_loss = np.array(losses).mean()
             mean_sdr = np.array(sdrs).mean()
@@ -257,7 +264,7 @@ def load_config_from_str(input_str):
     config = AttrDict()
     input_str = re.sub(r'\\\n', '', input_str)
     input_str = re.sub(r'//.*\n', '\n', input_str)
-    data = json.loads(input_str)
+    data = yaml.load(input_str, Loader=yaml.FullLoader)
     config.update(data)
     return config
 

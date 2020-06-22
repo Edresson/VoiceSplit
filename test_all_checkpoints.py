@@ -26,8 +26,9 @@ from models.voicesplit.model import VoiceSplit
 from utils.audio_processor import WrapperAudioProcessor as AudioProcessor 
 
 from shutil import copyfile
+import yaml
 
-def test(args, log_dir, checkpoint_path, trainloader, testloader, tensorboard, c, model_name, ap, cuda=True):
+def test(args, log_dir, checkpoint_path, testloader, tensorboard, c, model_name, ap, cuda=True):
     if(model_name == 'voicefilter'):
         model = VoiceFilter(c)
     elif(model_name == 'voicesplit'):
@@ -88,6 +89,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     all_checkpoints = sorted(glob(os.path.join(args.checkpoints_path, '*.pt')))
+    #print(all_checkpoints, os.listdir(args.checkpoints_path))
     if args.config_path:
         c = load_config(args.config_path)
     else: #load config in checkpoint
@@ -101,7 +103,8 @@ if __name__ == '__main__':
     tensorboard = TensorboardWriter(log_path, audio_config)
     # set test dataset dir
     c.dataset['test_dir'] = args.dataset_dir
-
+    # set batchsize = 1
+    c.train_config['batch_size'] = 1
     test_dataloader = test_dataloader(c, ap)
 
     best_sdr = 0
@@ -109,7 +112,6 @@ if __name__ == '__main__':
     best_sdr_checkpoint = ''
     best_loss_checkpoint = ''
     sdrs_checkpoint = []
-    
     for i in tqdm.tqdm(range(len(all_checkpoints))):
         checkpoint = all_checkpoints[i]
         mean_loss, mean_sdr = test(args, log_path, checkpoint, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
