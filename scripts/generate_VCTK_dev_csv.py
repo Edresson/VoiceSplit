@@ -15,7 +15,7 @@ for i in range(len(all_speakers)):
             interference_speaker = all_speakers[j]
             wav_samples = os.listdir(os.path.join(vctk_dir,vctk_wavs_dir,speaker_clean))
             clean_wav = random.choice(wav_samples).replace(speaker_clean, '')
-            emb_wav = random.choice(aux_wav_samples).replace(speaker_clean, '') # select one emb reference diferente then clean_wav
+            emb_wav = random.choice(clean_wav).replace(speaker_clean, '') # select one emb reference diferente then clean_wav
             while clean_wav == emb_wav: # its necessary for emb and clean not is same sample
                 emb_wav = random.choice(wav_samples).replace(speaker_clean, '')
             # get samples interference samples
