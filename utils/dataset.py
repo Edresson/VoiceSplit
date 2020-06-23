@@ -49,6 +49,9 @@ class Dataset(Dataset):
             target_spec, _ = self.ap.get_spec_from_audio(target_wav, return_phase=True)
             target_spec = torch.from_numpy(target_spec)
             mixed_spec = torch.from_numpy(mixed_spec)
+            mixed_phase = torch.from_numpy(mixed_phase)
+            target_wav = torch.from_numpy(target_wav)
+            mixed_wav = torch.from_numpy(mixed_wav)
             seq_len = torch.from_numpy(np.array([mixed_wav.shape[0]]))
             return emb, target_spec, mixed_spec, target_wav, mixed_wav, mixed_phase, seq_len
 
@@ -68,6 +71,15 @@ def test_dataloader(c, ap):
     return DataLoader(dataset=Dataset(c, ap, train=False),
                           collate_fn=test_collate_fn, batch_size=c.test_config['batch_size'], 
                           shuffle=False, num_workers=c.test_config['num_workers'])
+
+def eval_dataloader(c, ap):
+    return DataLoader(dataset=Dataset(c, ap, train=False),
+                          collate_fn=eval_collate_fn, batch_size=c.test_config['batch_size'], 
+                          shuffle=False, num_workers=c.test_config['num_workers'])
+
+
+def eval_collate_fn(batch):
+    return batch
 
 def train_collate_fn(item):
     embs_list = []
@@ -102,4 +114,38 @@ def train_collate_fn(item):
     return embs_list, target_list, mixed_list, seq_len_list, target_wav_list, mixed_phase_list
 
 def test_collate_fn(batch):
-        return batch
+    embs_list = []
+    target_list = []
+    mixed_list = []
+    seq_len_list = []
+    mixed_phase_list = []
+    target_wav_list = []
+    mixed_wav_list = []
+    
+    for emb, target, mixed, target_wav, mixed_wav, mixed_phase, seq_len in batch:
+        #print(emb)
+        if emb.tolist() == [0]:
+            #print("ignorado ", emb)
+            continue
+        embs_list.append(emb)
+        target_list.append(target)
+        mixed_list.append(mixed)
+        seq_len_list.append(seq_len)
+        mixed_phase_list.append(mixed_phase)
+        target_wav_list.append(target_wav)
+        mixed_wav_list.append(mixed_wav)
+
+    # concate tensors in dim 0
+    target_list = stack(target_list, dim=0)
+    mixed_list = stack(mixed_list, dim=0)
+    seq_len_list = stack(seq_len_list, dim=0)
+    target_wav_list = stack(target_wav_list, dim=0)
+    mixed_phase_list = stack(mixed_phase_list, dim=0) # np.array(mixed_phase_list)
+    mixed_wav_list = stack(mixed_wav_list, dim=0)
+    try:
+        embs_list = stack(embs_list, dim=0)
+    except:
+        #print('erro, stack')
+        embs_list = embs_list   
+    return embs_list, target_list, mixed_list, target_wav_list, mixed_wav_list, mixed_phase_list, seq_len_list
+  

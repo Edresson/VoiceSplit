@@ -17,9 +17,9 @@ from utils.generic_utils import set_init_dict
 
 from utils.tensorboard import TensorboardWriter
 
-from utils.dataset import test_dataloader, eval_dataloader
+from utils.dataset import test_dataloader
 
-from utils.generic_utils import validation, PowerLaw_Compressed_Loss, SiSNR_With_Pit
+from utils.generic_utils import validation, PowerLaw_Compressed_Loss, SiSNR_With_Pit, test_fast_with_si_srn
 
 from models.voicefilter.model import VoiceFilter
 from models.voicesplit.model import VoiceSplit
@@ -74,7 +74,7 @@ def test(args, log_dir, checkpoint_path, testloader, tensorboard, c, model_name,
         criterion = SiSNR_With_Pit()
     else:
         raise Exception(" The loss '"+c.loss['loss_name']+"' is not suported")
-    return validation(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda, loss_name=c.loss['loss_name'], test=True)
+    return test_fast_with_si_srn(criterion, ap, model, testloader, tensorboard, step,  cuda=cuda, loss_name=c.loss['loss_name'], test=True)
 
 
 if __name__ == '__main__':
@@ -103,28 +103,19 @@ if __name__ == '__main__':
     tensorboard = TensorboardWriter(log_path, audio_config)
     # set test dataset dir
     c.dataset['test_dir'] = args.dataset_dir
-    # set batchsize = 1
-    c.train_config['batch_size'] = 1
-    test_dataloader = eval_dataloader(c, ap)
-    print(c.dataset['format'])
-    best_sdr = 0
+    # set batchsize = 32
+    c.test_config['batch_size'] = 5
+    test_dataloader = test_dataloader(c, ap)
     best_loss = 999999999
-    best_sdr_checkpoint = ''
     best_loss_checkpoint = ''
     sdrs_checkpoint = []
     for i in tqdm.tqdm(range(len(all_checkpoints))):
         checkpoint = all_checkpoints[i]
-        mean_loss, mean_sdr = test(args, log_path, checkpoint, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
-        sdrs_checkpoint.append([mean_sdr, mean_loss, checkpoint])
+        mean_loss= test(args, log_path, checkpoint, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
+        sdrs_checkpoint.append([mean_loss, checkpoint])
         if mean_loss < best_loss:
             best_loss = mean_loss
             best_loss_checkpoint = checkpoint
-        if mean_sdr > best_sdr:
-            best_sdr = mean_sdr
-            best_sdr_checkpoint = checkpoint
-
-    print("Best SDR checkpoint is: ", best_sdr_checkpoint, "Best Loss checkpoint is: ", best_loss_checkpoint, "Best SDR:",best_sdr, "Best Loss:", best_loss)
-
-    copyfile(best_sdr_checkpoint, os.path.join(args.checkpoints_path,'best_checkpoint.pt'))
-
-    np.save(os.path.join(args.checkpoints_path,"SDRs_loss_validation_with_VCTK_best_SDR_is_"+str(best_sdr)+".np"), np.array(sdrs_checkpoint))
+    print("Best Loss checkpoint is: ", best_loss_checkpoint, "Best Loss:", best_loss)
+    copyfile(best_sdr_checkpoint, os.path.join(args.checkpoints_path,'fast_best_checkpoint.pt'))
+    np.save(os.path.join(args.checkpoints_path,"Loss_validation_with_VCTK_best_SI-SNR_is_"+str(best_sdr)+".np"), np.array(sdrs_checkpoint))

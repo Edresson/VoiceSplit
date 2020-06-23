@@ -218,9 +218,11 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, l
                 mixed_spec = mixed_spec[0].cpu().detach().numpy()
                 clean_spec = clean_spec[0].cpu().detach().numpy()
                 est_mag = est_mag[0].cpu().detach().numpy()
+                mixed_phase = mixed_phase[0].cpu().detach().numpy()
 
                 est_wav = ap.inv_spectrogram(est_mag, phase=mixed_phase)
                 est_mask = est_mask[0].cpu().detach().numpy()
+
                 if loss_name == 'si_snr':
                     test_loss = criterion(torch.from_numpy(np.array([[clean_wav]])), torch.from_numpy(np.array([[est_wav]])), seq_len).item()
                 sdr = bss_eval_sources(clean_wav, est_wav, False)[0][0]
@@ -244,11 +246,40 @@ def validation(criterion, ap, model, testloader, tensorboard, step, cuda=True, l
             print("Mean Test Loss:", mean_test_loss)
             print("Mean Test SDR:", mean_sdr)
             return mean_test_loss, mean_sdr
+
+def test_fast_with_si_srn(criterion, ap, model, testloader, tensorboard, step, cuda=True, loss_name='si_snr', test=False):
+    losses = []
+    model.eval()
+    # set fast and best criterion
+    criterion = SiSNR_With_Pit()
+    count = 0
+    with torch.no_grad():
+        for emb, clean_spec, mixed_spec, clean_wav, mixed_wav, mixed_phase, seq_len in testloader:  
+                if cuda:
+                    emb = emb.cuda()
+                    clean_spec = clean_spec.cuda()
+                    mixed_spec = mixed_spec.cuda()
+                    mixed_phase = mixed_phase.cuda()
+                    seq_len = seq_len.cuda()
+                est_mask = model(mixed_spec, emb)
+                est_mag = est_mask * mixed_spec
+                # convert spec to wav using phase
+                output = ap.torch_inv_spectrogram(est_mag, mixed_phase)
+                target = ap.torch_inv_spectrogram(clean_spec, mixed_phase)
+                shape = list(target.shape)
+                target = torch.reshape(target, [shape[0],1]+shape[1:]) # append channel dim
+                output = torch.reshape(output, [shape[0],1]+shape[1:]) # append channel dim
+                test_loss = criterion(output, target, seq_len).item()
+                losses.append(test_loss)
+           
+        mean_test_loss = np.array(losses).mean()
+        print("Mean Si-SRN with Pit Loss:", mean_test_loss)
+        return mean_test_loss
+
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
-
 
 def load_config(config_path):
     config = AttrDict()

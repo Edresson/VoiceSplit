@@ -14,7 +14,7 @@ from utils.generic_utils import set_init_dict
 
 from utils.tensorboard import TensorboardWriter
 
-from utils.dataset import train_dataloader, test_dataloader
+from utils.dataset import train_dataloader, eval_dataloader
 
 from utils.generic_utils import validation, PowerLaw_Compressed_Loss, SiSNR_With_Pit
 
@@ -159,5 +159,5 @@ if __name__ == '__main__':
         raise Exception("Please verify directories of dataset in "+args.config_path)
 
     train_dataloader = train_dataloader(c, ap)
-    test_dataloader = test_dataloader(c, ap)
+    test_dataloader = eval_dataloader(c, ap)
     train(args, log_path, args.checkpoint_path, train_dataloader, test_dataloader, tensorboard, c, c.model_name, ap, cuda=True)
