@@ -117,5 +117,5 @@ if __name__ == '__main__':
             best_loss = mean_loss
             best_loss_checkpoint = checkpoint
     print("Best Loss checkpoint is: ", best_loss_checkpoint, "Best Loss:", best_loss)
-    copyfile(best_sdr_checkpoint, os.path.join(args.checkpoints_path,'fast_best_checkpoint.pt'))
+    copyfile(best_loss_checkpoint, os.path.join(args.checkpoints_path,'fast_best_checkpoint.pt'))
     np.save(os.path.join(args.checkpoints_path,"Loss_validation_with_VCTK_best_SI-SNR_is_"+str(best_sdr)+".np"), np.array(sdrs_checkpoint))

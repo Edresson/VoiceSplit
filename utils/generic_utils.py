@@ -17,6 +17,273 @@ from mir_eval.separation import bss_eval_sources
 from itertools import permutations
 import torch.nn.functional as F
 import yaml
+from sklearn.preprocessing import minmax_scale
+
+import random
+from random import getrandbits
+# set random seed
+random.seed(0)
+
+def get_audios_with_random_amp(emb_audio, clean_audio, interference, noise_audio):
+    # noise audio amp is small than mean between clean 1 and interference 2.
+    # random amplitude sinal
+    min_amp = round(random.uniform(-1, -0.3), 1)
+    max_amp = round(random.uniform(0.3, 1), 1)
+    shape = emb_audio.shape
+    emb_audio = minmax_scale(emb_audio.ravel(), feature_range=(min_amp,max_amp)).reshape(shape)
+
+    min_amp_clean = round(random.uniform(-1, -0.3), 1)
+    max_amp_clean = round(random.uniform(0.3, 1), 1)
+    shape = clean_audio.shape
+    clean_audio = minmax_scale(clean_audio.ravel(), feature_range=(min_amp_clean,max_amp_clean)).reshape(shape)
+
+    min_amp_interference = round(random.uniform(-1, -0.3), 1)
+    max_amp_interference = round(random.uniform(0.3, 1), 1)
+    shape = interference.shape
+    interference = minmax_scale(interference.ravel(), feature_range=(min_amp_interference,max_amp_interference)).reshape(shape)
+    
+    min_noise = round(random.uniform(min(min_amp_clean,min_amp_interference),-0.3 ), 1)
+    max_noise = round(random.uniform(0.3, min(max_amp_clean,max_amp_interference)), 1)
+    shape = noise_audio.shape
+    noise_audio = minmax_scale(noise_audio.ravel(), feature_range=(min_noise,max_noise)).reshape(shape)
+
+    return emb_audio, clean_audio, interference, noise_audio
+
+def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise_1_path, nose2_path):
+    data_out_dir = output_dir
+    emb_audio, _ = librosa.load(embedding_utterance_path, sr=sample_rate)
+    clean_audio, _ = librosa.load(clean_utterance_path, sr=sample_rate)
+    interference, _ = librosa.load(interference_utterance_path, sr=sample_rate)
+    noise_1_audio, _ = librosa.load(noise_1_path, sr=sample_rate)
+    noise_2_audio, _ = librosa.load(noise_2_path, sr=sample_rate)
+
+    assert len(emb_audio.shape) == len(clean_audio.shape) == len(interference.shape) == 1, \
+        'wav files must be mono, not stereo'
+
+    # trim initial and end  wave file silence using librosa
+    emb_audio, _ = librosa.effects.trim(emb_audio, top_db=20)
+    clean_audio, _ = librosa.effects.trim(clean_audio, top_db=20)
+    interference, _ = librosa.effects.trim(interference, top_db=20)
+
+    # if reference for emebdding is too short, discard it
+    window = 80
+    hop_length = 160
+
+    if emb_audio.shape[0] < 1.1*window*hop_length:
+        return
+
+    two_clean = not getrandbits(1)
+    
+    # calculate frames using audio necessary for config.audio['audio_len'] seconds
+    seconds = random.randint(1,3)
+    audio_len_clean_max_value = int(sample_rate * seconds)
+
+    seconds = random.randint(1,3)
+    audio_len_interference_max_value = int(sample_rate * seconds)
+
+    out_audio_len = audio_len_clean_max_value+audio_len_interference_max_value
+    noise_start_slice = random.randint(0,len(noise_1_audio)-(out_audio_len+1))
+    # sum two diferents noise
+    noise_audio = noise_1_audio[noise_start_slice:out_audio_len]+noise_2_audio[noise_start_slice:out_audio_len]
+
+    # if merged audio is shorter than audio_len_seconds, discard it
+    if clean_audio.shape[0] < audio_len_clean_max_value or interference.shape[0] < audio_len_interference_max_value:
+        return
+
+    emb_audio_random, clean_audio_random, interference_random, noise_audio_random = get_audios_with_random_amp(emb_audio, clean_audio, interference, noise_audio)
+    
+
+
+    clean_audio = clean_audio[:audio_len_clean_max_value]
+    interference = interference[:audio_len_interference_max_value]
+    # random amp file 
+    clean_audio_random = clean_audio_random[:audio_len_clean_max_value]
+    interference_random = interference_random[:audio_len_interference_max_value]
+
+    # preparar ruido para as partes ( o mesmo ruido ) ( concatenar 2 ruidos diferentes)
+    
+    
+    
+    if two_clean:
+        clean_audio_parts = librosa.effects.split(clean_audio,top_db=20)
+        # adicionar rudio em  interference, clean_audio,  interference_random, clean_audio_random         
+        if len(clean_audio_parts) > 1:
+            #pega a metade e concatena
+            clip_idx = clean_audio_parts[int(len(clean_audio_parts)/2)][1]
+            # generate audio with amp normalised
+            part1 = clean_audio[:clip_idx]
+            part2 = clean_audio[clip_idx:]
+            len_part1 = len(part1)
+            len_interference = len(interference)
+
+            # noise without interruption
+            part1 = part1 + noise_audio[:len_part1]
+            interference = interference + noise_audio[len_part1:len_interference+len_part1]
+            part2 = part2 + noise_audio[len_interference+len_part1:len_interference+len_part1+len(part2)]
+            
+            zeros_interference = np.zeros(interference.shape)
+            mixed_audio = np.concatenate((part1, interference, part2))
+            clean_audio_padded = np.concatenate((part1, zeros_interference, part2))
+
+            # generate audios with random amp
+            part1 = clean_audio_random[:clip_idx]
+            part2 = clean_audio_random[clip_idx:]
+            len_part1 = len(part1)
+            len_interference = len(interference_randoms)
+            # noise without interruption
+            part1 = part1 + noise_audio_random[:len_part1]
+            interference_random = interference_random + noise_audio_random[len_part1:len_interference+len_part1]
+            part2 = part2 + noise_audio_random[len_interference+len_part1:len_interference+len_part1+len(part2)]
+            zeros_interference = np.zeros(interference_random.shape)
+            mixed_audio_random = np.concatenate((part1, interference_random, part2))
+            clean_audio_padded_random = np.concatenate((part1, zeros_interference, part2))
+
+        else:
+            # adicionando ruido
+            clean_audio = clean_audio + noise_audio[:len(clean_audio)]
+            interference = interference + noise_audio[len(clean_audio):len(clean_audio)+len(interference)]
+            zeros_interference = np.zeros(interference.shape)
+            mixed_audio = np.concatenate((clean_audio, interference))
+            clean_audio_padded = np.concatenate((clean_audio, zeros_interference))
+            
+            clean_audio_random = clean_audio_random + noise_audio_random[:len(clean_audio_random)]
+            interference_random = interference_random + noise_audio_random[len(clean_audio_random):len(clean_audio_random)+len(interference_random)]
+            mixed_audio_random = np.concatenate((clean_audio_random, interference_random))
+            clean_audio_padded_random = np.concatenate((clean_audio_random, zeros_interference))
+            
+
+    else: 
+        interference_parts = librosa.effects.split(interference,top_db=15)
+        # adicionar rudio em  interference, clean_audio,  interference_random, clean_audio_random 
+         if len(interference_parts) > 1:
+            #pega a metade e concatena
+            clip_idx = interference_parts[int(len(interference_parts)/2)][1]
+            part1 = interference[:clip_idx]
+            part2 = interference[clip_idx:]
+            len_part1 = len(part1)
+            len_clean = len(clean_audio)
+            part1 = part1 + noise_audio[:len_part1]
+            clean_audio = clean_audio + noise_audio[len_part1:len_clean+len_part1]
+            part2 = part2 + noise_audio[len_clean+len_part1:len_clean+len_part1+len(part2)]
+
+            zeros_part1 = np.zeros(part1.shape)
+            zeros_part2 = np.zeros(part2.shape)
+            mixed_audio = np.concatenate((part1, clean_audio, part2))
+            clean_audio_padded = np.concatenate((zeros_part1, clean_audio, zeros_part2))
+            
+            part1 = interference_random[:clip_idx]
+            part2 = interference_random[clip_idx:]
+
+            len_part1 = len(part1)
+            len_clean = len(clean_audio_random)
+            # noise without interruption
+            part1 = part1 + noise_audio_random[:len_part1]
+            clean_audio_random = clean_audio_random + noise_audio_random[len_part1:len_clean+len_part1]
+            part2 = part2 + noise_audio_random[len_clean+len_part1:len_clean+len_part1+len(part2)]
+
+
+            zeros_part1 = np.zeros(part1.shape)
+            zeros_part2 = np.zeros(part2.shape)
+            mixed_audio_random = np.concatenate((part1, clean_audio_random, part2))
+            clean_audio_padded_random = np.concatenate((zeros_part1, clean_audio_random, zeros_part2))
+            
+
+        else:
+            
+            interference = interference + noise_audio[:len(interference)]
+            clean_audio = clean_audio + noise_audio[len(interference):len(clean_audio)+len(interference)]
+            zeros_interference = np.zeros(interference.shape)
+            mixed_audio = np.concatenate((interference, clean_audio))
+            clean_audio_padded = np.concatenate((zeros_interference, clean_audio))
+
+            interference_random = interference_random + noise_audio_random[:len(interference_random)]
+            clean_audio_random = clean_audio_random + noise_audio[len(interference_random):len(clean_audio_random)+len(interference_random)]
+            mixed_audio_random = np.concatenate((interference_random, clean_audio_random))
+            clean_audio_padded_random = np.concatenate((zeros_interference, clean_audio_random))
+
+
+    # normlise audio
+    norm_factor = np.max(np.abs(mixed_audio)) * 1.1
+    clean_audio_padded = clean_audio_padded/norm_factor
+    emb_audio = emb_audio/norm_factor
+    mixed_audio = mixed_audio/norm_factor
+
+    interference = interference/norm_factor
+    clean_audio = clean_audio/norm_factor
+
+    interference_output = np.zeros(interference.shape)
+    clean_audio_output = clean_audio
+
+    norm_factor = np.max(np.abs(mixed_audio_random)) * 1.1
+    clean_audio_padded_random = clean_audio_padded_random/norm_factor
+    emb_audio_random = emb_audio_random/norm_factor
+    mixed_audio_random = mixed_audio_random/norm_factor
+
+    # salve normal files 
+    target_wav_path = glob_re_to_filename(data_out_dir, form['target_wav'], num, sub=1)
+    mixed_wav_path = glob_re_to_filename(data_out_dir, form['mixed_wav'], num, sub=1)
+    emb_wav_path = glob_re_to_filename(data_out_dir, form['emb_wav'], num, sub=1)
+    librosa.output.write_wav(emb_wav_path, emb_audio, sample_rate)
+    librosa.output.write_wav(target_wav_path, clean_audio_padded, sample_rate)
+    librosa.output.write_wav(mixed_wav_path, mixed_audio, sample_rate)
+
+    # extract and save spectrograms
+    clean_spec, _ = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec, _ = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num, sub=1)
+    mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num, sub=1)
+    torch.save(torch.from_numpy(clean_spec), clean_spec_path)
+    torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
+
+    # save input = output
+    target_wav_path = glob_re_to_filename(data_out_dir, form['target_wav'], num, sub=2)
+    mixed_wav_path = glob_re_to_filename(data_out_dir, form['mixed_wav'], num, sub=2)
+    emb_wav_path = glob_re_to_filename(data_out_dir, form['emb_wav'], num, sub=2)
+    librosa.output.write_wav(emb_wav_path, emb_audio, sample_rate)
+    librosa.output.write_wav(target_wav_path, clean_audio, sample_rate)
+    librosa.output.write_wav(mixed_wav_path, clean_audio, sample_rate)
+
+    # extract and save spectrograms
+    clean_spec, _ = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec, _ = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num, sub=2)
+    mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num, sub=2)
+    torch.save(torch.from_numpy(clean_spec), clean_spec_path)
+    torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
+
+    # save  output zero mask, the input dont have voice from embedding ref speaker
+    target_wav_path = glob_re_to_filename(data_out_dir, form['target_wav'], num, sub=3)
+    mixed_wav_path = glob_re_to_filename(data_out_dir, form['mixed_wav'], num, sub=3)
+    emb_wav_path = glob_re_to_filename(data_out_dir, form['emb_wav'], num, sub=3)
+    librosa.output.write_wav(emb_wav_path, emb_audio, sample_rate)
+    librosa.output.write_wav(target_wav_path, interference_output, sample_rate)
+    librosa.output.write_wav(mixed_wav_path, interference, sample_rate)
+
+    # extract and save spectrograms
+    clean_spec, _ = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec, _ = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num, sub=3)
+    mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num, sub=3)
+    torch.save(torch.from_numpy(clean_spec), clean_spec_path)
+    torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
+
+    # save  random amplitude files
+    target_wav_path = glob_re_to_filename(data_out_dir, form['target_wav'], num, sub=4)
+    mixed_wav_path = glob_re_to_filename(data_out_dir, form['mixed_wav'], num, sub=4)
+    emb_wav_path = glob_re_to_filename(data_out_dir, form['emb_wav'], num, sub=4)
+    librosa.output.write_wav(emb_wav_path, emb_audio_random, sample_rate)
+    librosa.output.write_wav(target_wav_path, clean_audio_padded_random, sample_rate)
+    librosa.output.write_wav(mixed_wav_path, mixed_audio_random, sample_rate)
+
+    # extract and save spectrograms
+    clean_spec, _ = ap.get_spec_from_audio_path(target_wav_path) # we need to load the wav to maintain compatibility with all audio backend
+    mixed_spec, _ = ap.get_spec_from_audio_path(mixed_wav_path)
+    clean_spec_path = glob_re_to_filename(data_out_dir, form['target'], num, sub=4)
+    mixed_spec_path = glob_re_to_filename(data_out_dir, form['mixed'], num, sub=4)
+    torch.save(torch.from_numpy(clean_spec), clean_spec_path)
+    torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
+
+
 
 def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path):
     data_out_dir = output_dir
@@ -65,7 +332,9 @@ def mix_wavfiles(output_dir, sample_rate, audio_len, ap, form, num, embedding_ut
     torch.save(torch.from_numpy(clean_spec), clean_spec_path)
     torch.save(torch.from_numpy(mixed_spec), mixed_spec_path)
 
-def glob_re_to_filename(dire, glob, num):
+def glob_re_to_filename(dire, glob, num, sub=False):
+    if sub:
+        return os.path.join(dire, glob.replace('*', '%06d_%d' %(num,sub)))
     return os.path.join(dire, glob.replace('*', '%06d' % num))
 
 # losses 
