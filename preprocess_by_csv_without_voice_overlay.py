@@ -16,15 +16,17 @@ import pandas as  pd
 
 if __name__ == '__main__':
     def train_wrapper(num):
-        clean_utterance_path, embedding_utterance_path, interference_utterance_path, noise1, noise2 = train_data[num]
-        
-        mix_wavfiles_without_voice_overlay(output_dir_train, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise1, noise2)
-        
+        try:
+            clean_utterance_path, embedding_utterance_path, interference_utterance_path, noise1, noise2 = train_data[num]
+            mix_wavfiles_without_voice_overlay(output_dir_train, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise1, noise2)
+        except:
+            print("Erro in sample: ", clean_utterance_path)
     def test_wrapper(num):
-        clean_utterance_path, embedding_utterance_path, interference_utterance_path, noise1, noise2 = test_data[num]
-        
-        mix_wavfiles_without_voice_overlay(output_dir_test, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise1, noise2)
-        
+        try:
+            clean_utterance_path, embedding_utterance_path, interference_utterance_path, noise1, noise2 = test_data[num]
+            mix_wavfiles_without_voice_overlay(output_dir_test, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise1, noise2)
+        except:
+            print("Erro in sample: ", clean_utterance_path)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, required=True,
@@ -74,7 +76,7 @@ if __name__ == '__main__':
     train_data = []
     test_data = []
     if args.librispeech:
-        if train_data_csv:
+        if train_data_csv is not None:
             for c, e, i in train_data_csv:
                 splits = c.split('-')
                 target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
@@ -83,10 +85,10 @@ if __name__ == '__main__':
                 splits = i.split('-')
                 interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
                 num_noise_files = len(noise_files)
-                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)])
-                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)])
+                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n','').replace('\n',''))
+                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
                 train_data.append([target_path, emb_ref_path, interference_path, noise_files1, noise_files2])
-        if test_data_csv:
+        if test_data_csv is not None:
             for c, e, i in test_data_csv:
                 splits = c.split('-')
                 target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
@@ -95,28 +97,29 @@ if __name__ == '__main__':
                 splits = i.split('-')
                 interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
                 num_noise_files = len(noise_files)
-                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)])
-                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)])
+                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
+                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
                 test_data.append([target_path, emb_ref_path, interference_path, noise_files1, noise_files2])
     else:
-        if train_data_csv:
+        if train_data_csv is not None:
             for c, e, i in train_data_csv:
                 num_noise_files = len(noise_files)
-                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)])
-                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)])
+                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
+                noise_files2 = os.path.join(dataset_root_dir,noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
                 train_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i), noise_files1, noise_files2])
-        if test_data_csv:
+        if test_data_csv is not None:
             for c, e, i in test_data_csv:
                 num_noise_files = len(noise_files)
-                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)])
-                noise_files2 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)])
+                noise_files1 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
+                noise_files2 = os.path.join(dataset_root_dir, noise_files[random.randint(0,num_noise_files)-1].replace('\n','').replace('\n',''))
                 test_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i), noise_files1, noise_files2])
 
-    if train_data_csv:
+    if train_data_csv is not None:
         train_idx = list(range(len(train_data)))
         with Pool(cpu_num) as p:
             r = list(tqdm.tqdm(p.imap(train_wrapper, train_idx), total=len(train_idx)))
-    if test_data_csv:
+    if test_data_csv is not None:
+        test_data  = test_data[:20]
         test_idx = list(range(len(test_data)))
         with Pool(cpu_num) as p:
             r = list(tqdm.tqdm(p.imap(test_wrapper, test_idx), total=len(test_idx)))

@@ -27,29 +27,30 @@ random.seed(0)
 def get_audios_with_random_amp(emb_audio, clean_audio, interference, noise_audio):
     # noise audio amp is small than mean between clean 1 and interference 2.
     # random amplitude sinal
-    min_amp = round(random.uniform(-1, -0.3), 1)
-    max_amp = round(random.uniform(0.3, 1), 1)
+    min_amp = random.uniform(-1, -0.3)
+    max_amp = (min_amp*-1)+random.uniform(0.0, 0.02)
     shape = emb_audio.shape
     emb_audio = minmax_scale(emb_audio.ravel(), feature_range=(min_amp,max_amp)).reshape(shape)
 
-    min_amp_clean = round(random.uniform(-1, -0.3), 1)
-    max_amp_clean = round(random.uniform(0.3, 1), 1)
+    min_amp_clean = random.uniform(-1, -0.3)
+    max_amp_clean = (min_amp_clean*-1)+random.uniform(0.0, 0.02)
     shape = clean_audio.shape
     clean_audio = minmax_scale(clean_audio.ravel(), feature_range=(min_amp_clean,max_amp_clean)).reshape(shape)
 
-    min_amp_interference = round(random.uniform(-1, -0.3), 1)
-    max_amp_interference = round(random.uniform(0.3, 1), 1)
+    min_amp_interference = random.uniform(-1, -0.3)
+    max_amp_interference = (min_amp_interference*-1)+random.uniform(0.0, 0.02)
     shape = interference.shape
     interference = minmax_scale(interference.ravel(), feature_range=(min_amp_interference,max_amp_interference)).reshape(shape)
     
-    min_noise = round(random.uniform(min(min_amp_clean,min_amp_interference),-0.3 ), 1)
-    max_noise = round(random.uniform(0.3, min(max_amp_clean,max_amp_interference)), 1)
+    min_noise = random.uniform(min(min_amp_clean,min_amp_interference),-0.1 )
+    max_noise = (min_noise*-1)-random.uniform(0.0, 0.02) #random.uniform(0.3, min(max_amp_clean,max_amp_interference))
+    #print(min_noise,max_noise, noise_audio.shape)
     shape = noise_audio.shape
     noise_audio = minmax_scale(noise_audio.ravel(), feature_range=(min_noise,max_noise)).reshape(shape)
 
     return emb_audio, clean_audio, interference, noise_audio
 
-def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise_1_path, nose2_path):
+def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, form, num, embedding_utterance_path, interference_utterance_path, clean_utterance_path, noise_1_path, noise_2_path):
     data_out_dir = output_dir
     emb_audio, _ = librosa.load(embedding_utterance_path, sr=sample_rate)
     clean_audio, _ = librosa.load(clean_utterance_path, sr=sample_rate)
@@ -65,6 +66,10 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
     clean_audio, _ = librosa.effects.trim(clean_audio, top_db=20)
     interference, _ = librosa.effects.trim(interference, top_db=20)
 
+    '''norm_factor = np.max(np.abs(clean_audio)) * 1.1
+    interference = interference / norm_factor
+    clean_audio = clean_audio / norm_factor'''
+
     # if reference for emebdding is too short, discard it
     window = 80
     hop_length = 160
@@ -75,24 +80,34 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
     two_clean = not getrandbits(1)
     
     # calculate frames using audio necessary for config.audio['audio_len'] seconds
-    seconds = random.randint(1,3)
+    seconds = random.randint(2,4)
     audio_len_clean_max_value = int(sample_rate * seconds)
 
-    seconds = random.randint(1,3)
+    seconds = random.randint(2,4)
     audio_len_interference_max_value = int(sample_rate * seconds)
 
+    #print(audio_len_interference_max_value, audio_len_clean_max_value,len(noise_1_audio))
     out_audio_len = audio_len_clean_max_value+audio_len_interference_max_value
-    noise_start_slice = random.randint(0,len(noise_1_audio)-(out_audio_len+1))
+    len_noise1 = len(noise_1_audio)
+    len_noise2 = len(noise_2_audio)
+    # calculate using smaller noise audio
+    noise_start_slice = random.randint(0,min(len_noise1,len_noise2)-(out_audio_len+1))
     # sum two diferents noise
-    noise_audio = noise_1_audio[noise_start_slice:out_audio_len]+noise_2_audio[noise_start_slice:out_audio_len]
-
+    noise_audio = noise_1_audio[noise_start_slice:noise_start_slice+out_audio_len]+noise_2_audio[noise_start_slice:noise_start_slice+out_audio_len]
+    #print(noise_audio.shape)
     # if merged audio is shorter than audio_len_seconds, discard it
     if clean_audio.shape[0] < audio_len_clean_max_value or interference.shape[0] < audio_len_interference_max_value:
         return
 
     emb_audio_random, clean_audio_random, interference_random, noise_audio_random = get_audios_with_random_amp(emb_audio, clean_audio, interference, noise_audio)
     
+    # normalise noise file
+    min_noise = random.uniform(min(clean_audio.min(),interference.min()),-0.1)
+    max_noise = (min_noise*-1)-random.uniform(0.0, 0.02) #random.uniform(0.3, min(max_amp_clean,max_amp_interference))
 
+    #print(min_noise,max_noise, noise_audio.shape)
+    shape = noise_audio.shape
+    noise_audio = minmax_scale(noise_audio.ravel(), feature_range=(min_noise,max_noise)).reshape(shape)
 
     clean_audio = clean_audio[:audio_len_clean_max_value]
     interference = interference[:audio_len_interference_max_value]
@@ -129,7 +144,7 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
             part1 = clean_audio_random[:clip_idx]
             part2 = clean_audio_random[clip_idx:]
             len_part1 = len(part1)
-            len_interference = len(interference_randoms)
+            len_interference = len(interference_random)
             # noise without interruption
             part1 = part1 + noise_audio_random[:len_part1]
             interference_random = interference_random + noise_audio_random[len_part1:len_interference+len_part1]
@@ -137,7 +152,6 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
             zeros_interference = np.zeros(interference_random.shape)
             mixed_audio_random = np.concatenate((part1, interference_random, part2))
             clean_audio_padded_random = np.concatenate((part1, zeros_interference, part2))
-
         else:
             # adicionando ruido
             clean_audio = clean_audio + noise_audio[:len(clean_audio)]
@@ -150,12 +164,11 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
             interference_random = interference_random + noise_audio_random[len(clean_audio_random):len(clean_audio_random)+len(interference_random)]
             mixed_audio_random = np.concatenate((clean_audio_random, interference_random))
             clean_audio_padded_random = np.concatenate((clean_audio_random, zeros_interference))
-            
 
     else: 
         interference_parts = librosa.effects.split(interference,top_db=15)
         # adicionar rudio em  interference, clean_audio,  interference_random, clean_audio_random 
-         if len(interference_parts) > 1:
+        if len(interference_parts) > 1:
             #pega a metade e concatena
             clip_idx = interference_parts[int(len(interference_parts)/2)][1]
             part1 = interference[:clip_idx]
@@ -189,7 +202,6 @@ def mix_wavfiles_without_voice_overlay(output_dir, sample_rate, audio_len, ap, f
             
 
         else:
-            
             interference = interference + noise_audio[:len(interference)]
             clean_audio = clean_audio + noise_audio[len(interference):len(clean_audio)+len(interference)]
             zeros_interference = np.zeros(interference.shape)

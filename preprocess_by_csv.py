@@ -72,7 +72,7 @@ if __name__ == '__main__':
     train_data = []
     test_data = []
     if args.librispeech:
-        if train_data_csv:
+        if train_data_csv is not None:
             for c, e, i in train_data_csv:
                 splits = c.split('-')
                 target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                 splits = i.split('-')
                 interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
                 train_data.append([target_path, emb_ref_path, interference_path])
-        if test_data_csv:
+        if test_data_csv is not None:
             for c, e, i in test_data_csv:
                 splits = c.split('-')
                 target_path = os.path.join(dataset_root_dir, splits[0], splits[1], c+'-norm.wav')
@@ -91,18 +91,18 @@ if __name__ == '__main__':
                 interference_path = os.path.join(dataset_root_dir, splits[0], splits[1], i+'-norm.wav')           
                 test_data.append([target_path, emb_ref_path, interference_path])
     else:
-        if train_data_csv:
+        if train_data_csv is not None:
             for c, e, i in train_data_csv:
                 train_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i)])
-        if test_data_csv:
+        if test_data_csv is not None:
             for c, e, i in test_data_csv:
                 test_data.append([os.path.join(dataset_root_dir,c), os.path.join(dataset_root_dir,e), os.path.join(dataset_root_dir,i)])
 
-    if train_data_csv:
+    if train_data_csv is not None:
         train_idx = list(range(len(train_data)))
         with Pool(cpu_num) as p:
             r = list(tqdm.tqdm(p.imap(train_wrapper, train_idx), total=len(train_idx)))
-    if test_data_csv:
+    if test_data_csv is not None:
         test_idx = list(range(len(test_data)))
         with Pool(cpu_num) as p:
             r = list(tqdm.tqdm(p.imap(test_wrapper, test_idx), total=len(test_idx)))
