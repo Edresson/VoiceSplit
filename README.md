@@ -20,13 +20,19 @@ For the task we intend to use the LibreSpeech dataset initially. However, to use
 
 
 ## Demos
-Colab notebooks Demo:
+Colab notebooks Demos:
+
 Exp 1: https://shorturl.at/eBX18
+
 Exp 2: https://shorturl.at/oyEJN
+
 Exp 3: https://shorturl.at/blnEW
+
 Exp 4: https://shorturl.at/qFJN8
+
 Exp 5 (best): https://shorturl.at/kvAQ8
-Site demo for the best experiment: https://edresson.github.io/VoiceSplit/
+
+Site demo for the experiment with best results (Exp 5): https://edresson.github.io/VoiceSplit/
 
 ## Future Works
 
