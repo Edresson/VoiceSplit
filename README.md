@@ -6,7 +6,7 @@ Pytorch unofficial implementation of [VoiceFilter: Targeted Voice Separation by 
 Final project for **SCC5830- Image Processing** @ ICMC/USP.
 
 ## Dataset
-For the task we intend to use the LibreSpeech dataset initially. However, to use it in this task, we need to generate audios with overlappings voices.
+For the task we intend to use the LibriSpeech dataset initially. However, to use it in this task, we need to generate audios with overlappings voices.
 
 ## Improvements
     We use Si-SNR with PIT instead of Power Law compressed loss, because it allows us to achieve a better result ( comparison available in: https://github.com/Edresson/VoiceSplit).
