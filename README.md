@@ -36,7 +36,15 @@ Exp 4: https://shorturl.at/qFJN8
 Exp 5 (best): https://shorturl.at/kvAQ8
 
 Site demo for the experiment with best results (Exp 5): https://edresson.github.io/VoiceSplit/
+## ToDos:
+Create documentation for the repository
+remove unused code
 
 ## Future Works
 
 * Train VoiceSplit model with GE2E3k and Mean Squared Error loss function
+
+## Acknowledgment:
+In this repository it contains codes of other collaborators, the due credits were given in the used functions:
+Preprocessing: Eren Gölge @erogol
+VoiceFilter Model: Seungwon Park @seungwonpark
