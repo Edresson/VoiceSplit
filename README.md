@@ -37,7 +37,7 @@ Exp 5 (best): https://shorturl.at/kvAQ8
 
 Site demo for the experiment with best results (Exp 5): https://edresson.github.io/VoiceSplit/
 ## ToDos:
-Create documentation for the repository
+Create documentation for the repository and
 remove unused code
 
 ## Future Works
