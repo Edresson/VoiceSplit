@@ -46,5 +46,7 @@ remove unused code
 
 ## Acknowledgment:
 In this repository it contains codes of other collaborators, the due credits were given in the used functions:
+
 Preprocessing: Eren Gölge @erogol
+
 VoiceFilter Model: Seungwon Park @seungwonpark
