@@ -467,8 +467,8 @@ class openVoiceFilterAudioProcessor():
         return mel
 
     def wav2spec(self, y):
-        audio_class = torchaudio.transforms.Spectrogram(n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length)#, window_fn=torch.hamming_window(self.n_fft,periodic=False, alpha=0.5, beta=0.5))
-        self.torch_spec = audio_class(torch.from_numpy(y))
+        # audio_class = torchaudio.transforms.Spectrogram(n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length)#, window_fn=torch.hamming_window(self.n_fft,periodic=False, alpha=0.5, beta=0.5))
+        # self.torch_spec = audio_class(torch.from_numpy(y))
         D = self.stft(y)
         S = self.amp_to_db(np.abs(D)) - self.ref_level_db
         S, D = self.normalize(S), np.angle(D)
