@@ -418,7 +418,7 @@ class SiSNR_With_Pit(nn.Module):
     def __init__(self):
         super(SiSNR_With_Pit, self).__init__()
         self.epsilon = 1e-16 # use epsilon for prevent  gradient explosion
-    def forward(self, source, estimate_source, source_lengths):
+    def forward(self, estimate_source, source, source_lengths):
         """
         Calculate SI-SNR with PIT training.
         Args:
