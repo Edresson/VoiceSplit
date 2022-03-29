@@ -18,15 +18,15 @@ You can see a report of what was done in this repository [here](https://github.c
 ## Demos
 Colab notebooks Demos:
 
-Exp 1: https://shorturl.at/eBX18
+Exp 1: [link](https://colab.research.google.com/drive/1GljrJOo_uMRfSUDIIht1Eo1HqaAkhY36?usp=sharing)
 
-Exp 2: https://shorturl.at/oyEJN
+Exp 2: [link](https://colab.research.google.com/drive/19Rh4YaZtcI2gSAvI9q40YUXubxOXLkUG?usp=sharing)
 
-Exp 3: https://shorturl.at/blnEW
+Exp 3: [link](https://drive.google.com/file/d/1b0gCNazK6exulR765PAI3xkMMXzBR-Fp/view?usp=sharing)
 
-Exp 4: https://shorturl.at/qFJN8
+Exp 4: [link](https://colab.research.google.com/drive/1AJ0VS8_Vv3Ayph20WFyi6iWASEJpQE3N?usp=sharing)
 
-Exp 5 (best): https://shorturl.at/kvAQ8
+Exp 5 (best): [link](https://colab.research.google.com/drive/1FYlaQX4XzN4W_6JB4z9R5SFrBF8a9RqC?usp=sharing)
 
 Site demo for the experiment with best results (Exp 5): https://edresson.github.io/VoiceSplit/
 ## ToDos:
